@@ -31,3 +31,4 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+.local-secret-key
