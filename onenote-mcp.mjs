@@ -40,7 +40,25 @@ function loadExistingToken() {
     if (fs.existsSync(tokenFilePath)) {
       const tokenData = fs.readFileSync(tokenFilePath, 'utf8');
       try {
-        const parsedToken = JSON.parse(tokenData); // New format: JSON object
+        const parsedToken = JSON.parse(tokenData);
+
+        // Check if token has expired
+        if (parsedToken.expiresOn) {
+          const expiryDate = new Date(parsedToken.expiresOn);
+          const now = new Date();
+
+          if (expiryDate <= now) {
+            console.error('⚠️  Token has expired. Please re-authenticate.');
+            console.error(`   Expired on: ${expiryDate.toLocaleString()}`);
+            return; // Don't set accessToken
+          }
+
+          const hoursUntilExpiry = Math.floor((expiryDate - now) / (1000 * 60 * 60));
+          if (hoursUntilExpiry < 24) {
+            console.error(`⏰ Token expires in ${hoursUntilExpiry} hours`);
+          }
+        }
+
         accessToken = parsedToken.token;
         console.error('Loaded existing token from file (JSON format).');
       } catch (parseError) {
