@@ -24,7 +24,7 @@ let graphClient = null;
 // --- MCP Server Initialization ---
 const server = new McpServer({
   name: 'onenote',
-  version: '1.0.0', 
+  version: '1.0.0',
   description: 'OneNote MCP Server - Read, Write, and Edit OneNote content.'
 });
 
@@ -200,7 +200,7 @@ function textToHtml(text) {
 
   html = html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
   html = html.replace(/(<blockquote>.*?<\/blockquote>(?:\s*<blockquote>.*?<\/blockquote>)*)/gs, '<blockquote>$1</blockquote>');
-  
+
   return html;
 }
 
@@ -234,7 +234,8 @@ async function fetchPageContentAdvanced(pageId, method = 'httpDirect') {
  */
 function formatPageInfo(page, index = null) {
   const prefix = index !== null ? `${index + 1}. ` : '';
-  return `${prefix}**${page.title}**
+  const name = page.displayName || page.title || 'Untitled';
+  return `${prefix}**${name}**
    ID: ${page.id}
    Created: ${new Date(page.createdDateTime).toLocaleDateString()}
    Modified: ${new Date(page.lastModifiedDateTime).toLocaleDateString()}`;
@@ -292,7 +293,7 @@ Token will be saved automatically upon successful browser authentication.`;
         }).catch(error => {
           console.error(`Background authentication failed: ${error.message}`);
         });
-        
+
         return { content: [{ type: 'text', text: authMessage }] };
       } else {
         return { isError: true, content: [{ type: 'text', text: 'Could not retrieve device code information. Please try again or check console logs.' }] };
@@ -357,6 +358,93 @@ server.tool(
       }
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: error.message.includes('authenticate') ? '🔐 Authentication Required. Run `authenticate` tool.' : `Failed to list notebooks: ${error.message}` }] };
+    }
+  }
+);
+
+server.tool(
+  'listSections',
+  {
+    notebookId: z.string().describe('The ID of the parent notebook.').optional(),
+    sectionGroupId: z.string().describe('The ID of the parent section group.').optional()
+  },
+  async ({ notebookId, sectionGroupId }) => {
+    try {
+      await ensureGraphClient();
+      let endpoint = '/me/onenote/sections';
+      if (notebookId) {
+        endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
+      } else if (sectionGroupId) {
+        endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
+      }
+
+      const response = await graphClient.api(endpoint).get();
+      if (response.value && response.value.length > 0) {
+        const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+        return { content: [{ type: 'text', text: `📂 **Sections** (${response.value.length} found):\n\n${list}` }] };
+      } else {
+        return { content: [{ type: 'text', text: '📂 No sections found.' }] };
+      }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: `Failed to list sections: ${error.message}` }] };
+    }
+  }
+);
+
+server.tool(
+  'listSectionGroups',
+  {
+    notebookId: z.string().describe('The ID of the parent notebook.').optional(),
+    sectionGroupId: z.string().describe('The ID of the parent section group.').optional()
+  },
+  async ({ notebookId, sectionGroupId }) => {
+    try {
+      await ensureGraphClient();
+      let endpoint = '/me/onenote/sectionGroups';
+      if (notebookId) {
+        endpoint = `/me/onenote/notebooks/${notebookId}/sectionGroups`;
+      } else if (sectionGroupId) {
+        endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sectionGroups`;
+      }
+
+      const response = await graphClient.api(endpoint).get();
+      if (response.value && response.value.length > 0) {
+        const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+        return { content: [{ type: 'text', text: `📁 **Section Groups** (${response.value.length} found):\n\n${list}` }] };
+      } else {
+        return { content: [{ type: 'text', text: '📁 No section groups found.' }] };
+      }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: `Failed to list section groups: ${error.message}` }] };
+    }
+  }
+);
+
+server.tool(
+  'searchSections',
+  {
+    query: z.string().describe('The search term for section names.')
+  },
+  async ({ query }) => {
+    try {
+      await ensureGraphClient();
+      const response = await graphClient.api('/me/onenote/sections').get();
+      let sections = response.value || [];
+
+      if (query) {
+        const searchTerm = query.toLowerCase();
+        sections = sections.filter(s => (s.displayName || s.title || '').toLowerCase().includes(searchTerm));
+      }
+
+      if (sections.length > 0) {
+        const list = sections.slice(0, 10).map((item, i) => formatPageInfo(item, i)).join('\n\n');
+        const more = sections.length > 10 ? `\n\n... and ${sections.length - 10} more.` : '';
+        return { content: [{ type: 'text', text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}` }] };
+      } else {
+        return { content: [{ type: 'text', text: `🔍 No sections found matching "${query}".` }] };
+      }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: `Failed to search sections: ${error.message}` }] };
     }
   }
 );
@@ -475,7 +563,7 @@ server.tool(
       await ensureGraphClient();
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       console.error(`Updating content for page: "${pageInfo.title}" (ID: ${pageId})`);
-      
+
       const htmlContentForUpdate = textToHtml(newContent);
       const finalHtml = `
         <div>
@@ -485,16 +573,16 @@ server.tool(
           <p><em>Updated via OneNote MCP on ${new Date().toLocaleString()}</em></p>
         </div>
       `;
-      
+
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'body', action: 'replace', content: finalHtml }])
       });
-      
+
       if (!response.ok) throw new Error(`Update failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **Page Content Updated!**\nPage: ${pageInfo.title}\nUpdated: ${new Date().toLocaleString()}\nContent Length: ${newContent.length} chars.` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to update page content for ID "${pageId}": ${error.message}` }] };
@@ -515,22 +603,22 @@ server.tool(
       await ensureGraphClient();
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       console.error(`Appending content to page: "${pageInfo.title}" (ID: ${pageId})`);
-      
+
       const htmlContentToAppend = textToHtml(newContent);
       let appendHtml = '';
       if (addSeparator) appendHtml += '<hr>';
       if (addTimestamp) appendHtml += `<p><em>Added on ${new Date().toLocaleString()}</em></p>`;
       appendHtml += htmlContentToAppend;
-      
+
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'body', action: 'append', content: appendHtml }])
       });
-      
+
       if (!response.ok) throw new Error(`Append failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **Content Appended!**\nPage: ${pageInfo.title}\nAppended: ${new Date().toLocaleString()}\nLength: ${newContent.length} chars.` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to append content to page ID "${pageId}": ${error.message}` }] };
@@ -550,16 +638,16 @@ server.tool(
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       const oldTitle = pageInfo.title;
       console.error(`Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`);
-      
+
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'title', action: 'replace', content: newTitle }])
       });
-      
+
       if (!response.ok) throw new Error(`Title update failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **Page Title Updated!**\nOld Title: ${oldTitle}\nNew Title: ${newTitle}\nUpdated: ${new Date().toLocaleString()}` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to update page title for ID "${pageId}": ${error.message}` }] };
@@ -581,15 +669,15 @@ server.tool(
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       const htmlContent = await fetchPageContentAdvanced(pageId, 'httpDirect');
       console.error(`Replacing text in page: "${pageInfo.title}" (ID: ${pageId})`);
-      
+
       const flags = caseSensitive ? 'g' : 'gi';
       const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
       const matches = (htmlContent.match(regex) || []).length;
-      
+
       if (matches === 0) {
         return { content: [{ type: 'text', text: `ℹ️ **No matches found** for "${findText}" in page: ${pageInfo.title}.` }] };
       }
-      
+
       const updatedContent = htmlContent.replace(regex, replaceText);
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
@@ -597,9 +685,9 @@ server.tool(
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` }])
       });
-      
+
       if (!response.ok) throw new Error(`Replace failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **Text Replaced!**\nPage: ${pageInfo.title}\nFound: "${findText}" (${matches} occurrences)\nReplaced with: "${replaceText}".` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to replace text in page ID "${pageId}": ${error.message}` }] };
@@ -626,7 +714,7 @@ server.tool(
       await ensureGraphClient();
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       console.error(`Adding ${noteType} to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
-      
+
       const icons = { note: '📝', todo: '✅', important: '🚨', question: '❓' };
       const colors = { note: '#e3f2fd', todo: '#e8f5e8', important: '#ffebee', question: '#fff3e0' };
       const noteHtml = `
@@ -634,7 +722,7 @@ server.tool(
           <p><strong>${icons[noteType]} ${noteType.charAt(0).toUpperCase() + noteType.slice(1)}</strong> - <em>${new Date().toLocaleString()}</em></p>
           <p>${textToHtml(note)}</p>
         </div>`;
-      
+
       const action = position === 'top' ? 'prepend' : 'append';
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
@@ -642,9 +730,9 @@ server.tool(
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'body', action: action, content: noteHtml }])
       });
-      
+
       if (!response.ok) throw new Error(`Add note failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **${noteType.charAt(0).toUpperCase() + noteType.slice(1)} Added!**\nPage: ${pageInfo.title}\nPosition: ${position}.` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to add note to page ID "${pageId}": ${error.message}` }] };
@@ -668,15 +756,15 @@ server.tool(
       await ensureGraphClient();
       const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
       console.error(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
-      
+
       const rows = tableData.trim().split('\n').map(row => row.split(',').map(cell => cell.trim()));
       if (rows.length < 2) throw new Error('Table data must have at least a header row and one data row.');
-      
+
       const headerRow = rows[0];
       const dataRows = rows.slice(1);
       let tableHtml = title ? `<h3>📊 ${textToHtml(title)}</h3>` : '';
       tableHtml += `<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead><tr style="background-color: #f5f5f5;">${headerRow.map(cell => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${textToHtml(cell)}</th>`).join('')}</tr></thead><tbody>${dataRows.map(row => `<tr>${row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${textToHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-      
+
       const action = position === 'top' ? 'prepend' : 'append';
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
       const response = await fetch(url, {
@@ -684,9 +772,9 @@ server.tool(
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ target: 'body', action: action, content: tableHtml }])
       });
-      
+
       if (!response.ok) throw new Error(`Add table failed: ${response.status} ${response.statusText}`);
-      
+
       return { content: [{ type: 'text', text: `✅ **Table Added!**\nPage: ${pageInfo.title}\nTitle: ${title || 'Untitled'}\nPosition: ${position}.` }] };
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: `❌ Failed to add table to page ID "${pageId}": ${error.message}` }] };
@@ -705,14 +793,14 @@ server.tool(
     try {
       await ensureGraphClient();
       console.error(`Attempting to create page with title: "${title}"`);
-      
+
       const sectionsResponse = await graphClient.api('/me/onenote/sections').get();
       if (!sectionsResponse.value || sectionsResponse.value.length === 0) {
         throw new Error('No sections found in your OneNote. Cannot create a page.');
       }
       const targetSectionId = sectionsResponse.value[0].id;
       const targetSectionName = sectionsResponse.value[0].displayName;
-      
+
       const htmlContent = textToHtml(content);
       const pageHtml = `<!DOCTYPE html>
 <html>
@@ -727,12 +815,12 @@ server.tool(
   <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
 </body>
 </html>`;
-      
+
       const response = await graphClient
         .api(`/me/onenote/sections/${targetSectionId}/pages`)
         .header('Content-Type', 'application/xhtml+xml')
         .post(pageHtml);
-      
+
       return {
         content: [{
           type: 'text',
@@ -768,17 +856,17 @@ async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    
+
     console.error('🚀✨ OneNote Ultimate MCP Server is now LIVE! ✨🚀');
     console.error(`   Client ID: ${clientId.substring(0, 8)}... (Using ${process.env.AZURE_CLIENT_ID ? 'environment variable' : 'default'})`);
     console.error('   Ready to manage your OneNote like never before!');
     console.error('--- Available Tool Categories ---');
     console.error('   🔐 Auth: authenticate, saveAccessToken');
-    console.error('   📚 Read: listNotebooks, searchPages, getPageContent, getPageByTitle');
+    console.error('   📚 Read: listNotebooks, searchPages, getPageContent, getPageByTitle, listSections, listSectionGroups, searchSections');
     console.error('   ✏️ Edit: updatePageContent, appendToPage, updatePageTitle, replaceTextInPage, addNoteToPage, addTableToPage');
     console.error('   ➕ Create: createPage');
     console.error('---------------------------------');
-    
+
     process.on('SIGINT', () => {
       console.error('\n🔌 OneNote MCP Server shutting down gracefully...');
       process.exit(0);

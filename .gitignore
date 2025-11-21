@@ -6,10 +6,12 @@ yarn-error.log*
 package-lock.json
 
 # Project-specific files
-.access-token.txt # CRITICAL: Contains sensitive authentication token
+# CRITICAL: Contains sensitive authentication token
+.access-token.txt
 *.log
 
 # Environment variables
+*.env
 .env
 .env*.local
 .env.*.local
