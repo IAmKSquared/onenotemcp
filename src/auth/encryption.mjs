@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { KeyStorage } from '../../key-storage.mjs';
+import { KeyStorage } from './key-storage.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);

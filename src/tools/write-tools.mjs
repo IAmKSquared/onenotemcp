@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createToolHandler } from '../api/retry.mjs';
 import { patchPageContent } from '../utils/validation.mjs';
-import { textToHtml, validateId, validateCsvData } from '../../utils.mjs';
+import { textToHtml, validateId, validateCsvData } from '../utils/common.mjs';
 import { fetchPageContentAdvanced } from '../utils/validation.mjs';
 
 /**

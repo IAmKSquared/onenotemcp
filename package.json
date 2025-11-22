@@ -7,9 +7,9 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
-    "test:unit": "node --test test_unit.mjs",
-    "test:smoke": "node test_smoke.mjs",
-    "test:integration": "node test_integration.mjs",
+    "test:unit": "node --test test/test_unit.mjs",
+    "test:smoke": "node test/test_smoke.mjs",
+    "test:integration": "node test/test_integration.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,mjs,json,md}\"",

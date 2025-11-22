@@ -1,4 +1,4 @@
-import { textToHtml } from '../../utils.mjs';
+import { textToHtml } from '../utils/common.mjs';
 
 /**
  * Formats OneNote page information for display.

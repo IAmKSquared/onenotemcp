@@ -14,7 +14,7 @@ import {
   textToHtml,
   Cache,
   validateCsvData,
-} from './utils.mjs';
+} from '../src/utils/common.mjs';
 
 // ============================================================================
 // Security Functions Tests

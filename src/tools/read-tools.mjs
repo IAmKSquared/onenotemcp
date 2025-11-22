@@ -8,7 +8,7 @@ import {
   validateId,
   extractTextSummary,
   extractReadableText,
-} from '../../utils.mjs';
+} from '../utils/common.mjs';
 
 /**
  * Registers read-related tools with the MCP server.

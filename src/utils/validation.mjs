@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { validateId } from '../../utils.mjs';
+import { validateId } from '../utils/common.mjs';
 
 /**
  * Fetches the content of a OneNote page.
