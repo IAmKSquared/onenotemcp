@@ -173,6 +173,103 @@ async function ensureGraphClient() {
 }
 
 // ============================================================================
+// CACHING LAYER
+// ============================================================================
+
+/**
+ * Simple in-memory cache with TTL (time-to-live) for API responses.
+ */
+class Cache {
+  constructor() {
+    this.cache = new Map();
+    this.defaultTTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  }
+
+  /**
+   * Gets a cached value if it exists and hasn't expired.
+   * @param {string} key - The cache key.
+   * @returns {any} The cached value or undefined if not found or expired.
+   */
+  get(key) {
+    const item = this.cache.get(key);
+    if (!item) return undefined;
+
+    // Check if expired
+    if (Date.now() > item.expiry) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    return item.value;
+  }
+
+  /**
+   * Sets a value in the cache with optional TTL.
+   * @param {string} key - The cache key.
+   * @param {any} value - The value to cache.
+   * @param {number} [ttl] - Time-to-live in milliseconds (defaults to 5 minutes).
+   */
+  set(key, value, ttl = this.defaultTTL) {
+    this.cache.set(key, {
+      value,
+      expiry: Date.now() + ttl
+    });
+  }
+
+  /**
+   * Invalidates a specific cache key or pattern.
+   * @param {string|RegExp} keyOrPattern - The key or pattern to invalidate.
+   */
+  invalidate(keyOrPattern) {
+    if (typeof keyOrPattern === 'string') {
+      this.cache.delete(keyOrPattern);
+    } else if (keyOrPattern instanceof RegExp) {
+      // Invalidate all keys matching the pattern
+      for (const key of this.cache.keys()) {
+        if (keyOrPattern.test(key)) {
+          this.cache.delete(key);
+        }
+      }
+    }
+  }
+
+  /**
+   * Clears all cached items.
+   */
+  clear() {
+    this.cache.clear();
+  }
+}
+
+// Global cache instance
+const apiCache = new Cache();
+
+/**
+ * Wraps an API call with caching logic.
+ * @param {string} cacheKey - The key to use for caching.
+ * @param {Function} apiCall - The async function that makes the API call.
+ * @param {number} [ttl] - Optional TTL override.
+ * @returns {Promise<any>} The API response (cached or fresh).
+ */
+async function cachedApiCall(cacheKey, apiCall, ttl) {
+  // Check cache first
+  const cached = apiCache.get(cacheKey);
+  if (cached !== undefined) {
+    console.error(`✨ Cache hit: ${cacheKey}`);
+    return cached;
+  }
+
+  // Cache miss - make the API call
+  console.error(`🔄 Cache miss: ${cacheKey}`);
+  const result = await apiCall();
+
+  // Store in cache
+  apiCache.set(cacheKey, result, ttl);
+
+  return result;
+}
+
+// ============================================================================
 // HTML CONTENT PROCESSING UTILITIES
 // ============================================================================
 
@@ -637,7 +734,11 @@ server.tool(
   'listNotebooks',
   {},
   createToolHandler(async () => {
-    const response = await graphClient.api('/me/onenote/notebooks').get();
+    const response = await cachedApiCall(
+      'notebooks:list',
+      async () => await graphClient.api('/me/onenote/notebooks').get()
+    );
+
     if (response.value && response.value.length > 0) {
       const notebookList = response.value.map((nb, i) => formatPageInfo(nb, i)).join('\n\n');
       return { content: [{ type: 'text', text: `📚 **Your OneNote Notebooks** (${response.value.length} found):\n\n${notebookList}` }] };
@@ -655,13 +756,21 @@ server.tool(
   },
   createToolHandler(async ({ notebookId, sectionGroupId }) => {
     let endpoint = '/me/onenote/sections';
+    let cacheKey = 'sections:list';
+
     if (notebookId) {
       endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
+      cacheKey = `sections:list:notebook:${notebookId}`;
     } else if (sectionGroupId) {
       endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
+      cacheKey = `sections:list:group:${sectionGroupId}`;
     }
 
-    const response = await graphClient.api(endpoint).get();
+    const response = await cachedApiCall(
+      cacheKey,
+      async () => await graphClient.api(endpoint).get()
+    );
+
     if (response.value && response.value.length > 0) {
       const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
       return { content: [{ type: 'text', text: `📂 **Sections** (${response.value.length} found):\n\n${list}` }] };
@@ -802,9 +911,8 @@ server.tool(
         return { content: [{ type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` }] };
       }
 
-      // Get pages from all sections in this notebook
-      const allPages = [];
-      for (const section of sections) {
+      // Get pages from all sections in this notebook (in parallel for performance)
+      const sectionPagePromises = sections.map(async (section) => {
         let sectionRequest = graphClient.api(`/me/onenote/sections/${section.id}/pages`)
           .select('id,title,lastModifiedDateTime')
           .top(50);
@@ -814,8 +922,12 @@ server.tool(
         }
 
         const sectionPages = await sectionRequest.get();
-        allPages.push(...(sectionPages.value || []));
-      }
+        return sectionPages.value || [];
+      });
+
+      // Wait for all section queries to complete
+      const sectionResults = await Promise.all(sectionPagePromises);
+      const allPages = sectionResults.flat();
 
       const pages = allPages.slice(0, 50); // Limit to 50 total
 
@@ -1276,6 +1388,9 @@ server.tool(
       .api('/me/onenote/notebooks')
       .post({ displayName });
 
+    // Invalidate notebook list cache
+    apiCache.invalidate('notebooks:list');
+
     return {
       content: [{
         type: 'text',
@@ -1313,6 +1428,10 @@ server.tool(
     const response = await graphClient
       .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
       .post({ displayName });
+
+    // Invalidate sections cache for this notebook and general sections list
+    apiCache.invalidate(`sections:list:notebook:${validatedNotebookId}`);
+    apiCache.invalidate('sections:list');
 
     return {
       content: [{
@@ -1352,6 +1471,9 @@ server.tool(
       .api(`/me/onenote/notebooks/${validatedNotebookId}/sectionGroups`)
       .post({ displayName });
 
+    // Invalidate section groups cache (if we add it in the future)
+    // Cache invalidation would go here when listSectionGroups is cached
+
     return {
       content: [{
         type: 'text',
@@ -1378,17 +1500,23 @@ server.tool(
 
     console.error(`Copying page ${validatedPageId} to section ${validatedSectionId}`);
 
-    // Get page title for display
-    const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
-
-    // Verify target section exists
-    let targetSectionName;
+    // Fetch page and section info in parallel for better performance
+    let pageInfo, targetSectionName;
     try {
-      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
-      targetSectionName = sectionInfo.displayName;
+      const [pageResult, sectionResult] = await Promise.all([
+        graphClient.api(`/me/onenote/pages/${validatedPageId}`).get(),
+        graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get()
+      ]);
+      pageInfo = pageResult;
+      targetSectionName = sectionResult.displayName;
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        // Determine which resource wasn't found
+        if (error.message && error.message.includes('section')) {
+          throw new Error(`Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        } else {
+          throw new Error(`Page with ID "${validatedPageId}" not found.`);
+        }
       }
       throw error;
     }

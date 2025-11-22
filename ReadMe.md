@@ -37,6 +37,10 @@ This server provides a rich set of tools for advanced OneNote management, includ
 *   **Security & Validation:**
     *   Input validation and sanitization to prevent injection attacks.
     *   Uses Zod for defining and validating tool input schemas.
+*   **Performance Optimizations:**
+    *   In-memory caching with TTL for frequently accessed resources (notebooks, sections).
+    *   Parallel API calls for multi-section queries to reduce latency.
+    *   Batch resource validation to minimize redundant API requests.
 
 
 ## Prerequisites
