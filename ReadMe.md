@@ -84,6 +84,50 @@ manipulation.
     npm install
     ```
 
+## Project Structure
+
+The codebase follows a modular architecture for maintainability and clarity:
+
+```
+onenote-mcp-server/
+├── src/
+│   ├── auth/               # Authentication modules
+│   │   ├── device-code-flow.mjs    # OAuth device code flow
+│   │   ├── token-manager.mjs       # Token file operations
+│   │   ├── encryption.mjs          # AES-256-CBC encryption
+│   │   └── key-storage.mjs         # OS keychain integration
+│   ├── api/                # API infrastructure
+│   │   ├── cache.mjs              # Caching layer with TTL
+│   │   └── retry.mjs              # Retry logic with exponential backoff
+│   ├── tools/              # MCP tool definitions
+│   │   ├── auth-tools.mjs         # Authentication tools
+│   │   ├── read-tools.mjs         # Read operations (list, search, get)
+│   │   ├── write-tools.mjs        # Edit operations (update, append, replace)
+│   │   └── create-tools.mjs       # Creation tools (notebooks, sections, pages)
+│   ├── utils/              # Shared utilities
+│   │   ├── common.mjs             # Core utilities (validation, conversion, cache)
+│   │   ├── html.mjs               # HTML formatting helpers
+│   │   └── validation.mjs         # Resource validation and fetching
+│   ├── config/             # Configuration
+│   │   └── constants.mjs          # Centralized constants (no magic numbers)
+│   ├── session.mjs         # Session state management
+│   └── server.mjs          # Main entry point
+├── test/                   # Test suite
+│   ├── test_unit.mjs              # 94 unit tests
+│   ├── test_smoke.mjs             # Server startup verification
+│   └── test_integration.mjs       # 50 integration tests
+└── package.json
+```
+
+**Key architectural features:**
+
+- **Modular design:** Clear separation of concerns (auth, API, tools, utilities)
+- **Session management:** Encapsulated state via `OneNoteSession` class (no
+  global variables)
+- **Centralized configuration:** All magic numbers replaced with named constants
+- **Comprehensive testing:** 144 tests covering security, functionality, and
+  integration
+
 ## Configuration
 
 1.  **Azure Client ID:** This server requires an Azure Application Client ID to
@@ -99,7 +143,8 @@ manipulation.
       public Client ID. This is suitable for initial testing but not recommended
       for prolonged or shared use.
     - Alternatively, you can modify the `clientId` variable directly in
-      `onenote-mcp.mjs`, but using an environment variable is preferred.
+      `src/auth/device-code-flow.mjs`, but using an environment variable is
+      preferred.
 
 2.  **`.gitignore`:** The project includes a `.gitignore` file. Ensure it
     contains at least the following to prevent committing sensitive files:
@@ -118,7 +163,13 @@ manipulation.
 Once configured, start the server from the project's root directory:
 
 ```bash
-node onenote-mcp.mjs
+npm start
+```
+
+Or directly:
+
+```bash
+node src/server.mjs
 ```
 
 You should see console output indicating the server has started and listing the
@@ -140,16 +191,32 @@ or Cursor.
 
 2.  Add or update the `mcpServers` configuration:
 
+    **Basic configuration (uses default client ID):**
+
     ```json
     {
       "mcpServers": {
         "onenote": {
           "command": "node",
           "args": [
-            "/full/path/to/your/onenote-ultimate-mcp-server/onenote-mcp.mjs"
+            "/full/path/to/your/onenote-ultimate-mcp-server/src/server.mjs"
+          ]
+        }
+      }
+    }
+    ```
+
+    **With custom Azure client ID (optional):**
+
+    ```json
+    {
+      "mcpServers": {
+        "onenote": {
+          "command": "node",
+          "args": [
+            "/full/path/to/your/onenote-ultimate-mcp-server/src/server.mjs"
           ],
           "env": {
-            // Recommended: Set AZURE_CLIENT_ID here if not set globally
             "AZURE_CLIENT_ID": "YOUR_AZURE_APP_CLIENT_ID_HERE"
           }
         }
@@ -159,9 +226,12 @@ or Cursor.
 
     - Replace `/full/path/to/your/onenote-ultimate-mcp-server/` with the
       **absolute path** to where you cloned the repository.
-    - Replace `YOUR_AZURE_APP_CLIENT_ID_HERE` with your Azure App's Client ID,
-      especially if you are not setting it as a system-wide environment
-      variable.
+    - Note: The path should point to `src/server.mjs` in the project directory.
+    - The `env` section is **optional** and only needed if:
+      - You want to use a custom Azure App client ID, AND
+      - You haven't set `AZURE_CLIENT_ID` as a system-wide environment variable
+    - If omitted, the server uses the Microsoft Graph Explorer's public client
+      ID (suitable for testing and personal use).
 
 3.  Restart your MCP client (Claude Desktop/Cursor).
 
@@ -306,20 +376,20 @@ npm test
 **Run specific test types:**
 
 ```bash
-npm run test:unit         # Unit tests (57 tests for utility functions)
+npm run test:unit         # Unit tests (94 tests for utility functions)
 npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
-npm run test:integration  # Integration test (calls actual MCP tools)
+npm run test:integration  # Integration tests (50 tests for core functionality)
 ```
 
 ### Test Structure
 
-- **test_unit.mjs** - Unit tests for utility functions (escapeODataString,
-  sanitizeUrl, validateId, extractReadableText, extractTextSummary, textToHtml,
-  Cache class)
-- **test_smoke.mjs** - Smoke test that verifies the MCP server starts and all 22
-  tools are properly registered
-- **test_integration.mjs** - Integration tests that invoke tools and validate
-  responses with the Microsoft Graph API
+- **test/test_unit.mjs** - Unit tests (94 tests) for utility functions
+  (escapeODataString, sanitizeUrl, validateId, extractReadableText,
+  extractTextSummary, textToHtml, Cache class, CSV validation)
+- **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
+  all 22 tools are properly registered
+- **test/test_integration.mjs** - Integration tests (50 tests) that validate
+  encryption, retry logic, error handling, and formatting functions
 
 ### Test Coverage
 
@@ -389,7 +459,7 @@ manual intervention.
   - Ensure all dependencies are installed (`npm install`).
 - **MCP Client Issues (e.g., Claude Desktop, Cursor):**
   - Verify the `command` and `args` (especially the absolute path to
-    `onenote-mcp.mjs`) in your client's MCP server configuration are correct.
+    `src/server.mjs`) in your client's MCP server configuration are correct.
   - Restart the MCP client after making configuration changes.
   - Check the MCP client's logs and the server's console output for errors.
 

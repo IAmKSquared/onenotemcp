@@ -3,6 +3,25 @@
  * Centralized location for all magic numbers and configuration values
  */
 
+// ===== Authentication Configuration =====
+
+/**
+ * Authentication settings for Microsoft Graph API.
+ */
+export const AUTH_CONFIG = {
+  /**
+   * Default Azure Application Client ID.
+   * Uses Microsoft Graph Explorer's public client ID for testing.
+   * Override with AZURE_CLIENT_ID environment variable for production.
+   */
+  DEFAULT_CLIENT_ID: '14d82eec-204b-4c2f-b7e8-296a70dab67e',
+
+  /**
+   * Required OAuth scopes for OneNote access.
+   */
+  SCOPES: ['Notes.Read', 'Notes.ReadWrite', 'Notes.Create', 'User.Read'],
+};
+
 // ===== HTTP Status Codes =====
 
 /**

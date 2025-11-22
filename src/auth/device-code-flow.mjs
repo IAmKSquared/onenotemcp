@@ -1,10 +1,10 @@
 import { DeviceCodeCredential } from '@azure/identity';
 import { saveToken } from './token-manager.mjs';
-import { TIMEOUTS } from '../config/constants.mjs';
+import { TIMEOUTS, AUTH_CONFIG } from '../config/constants.mjs';
 
 // --- Configuration ---
-const clientId = process.env.AZURE_CLIENT_ID || '14d82eec-204b-4c2f-b7e8-296a70dab67e'; // Default: Microsoft Graph Explorer App ID
-const scopes = ['Notes.Read', 'Notes.ReadWrite', 'Notes.Create', 'User.Read'];
+const clientId = process.env.AZURE_CLIENT_ID || AUTH_CONFIG.DEFAULT_CLIENT_ID;
+const scopes = AUTH_CONFIG.SCOPES;
 
 /**
  * Initiates device code authentication flow.
