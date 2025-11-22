@@ -298,6 +298,34 @@ async function patchPageContent(pageId, operations, errorPrefix = 'PATCH operati
   return response;
 }
 
+/**
+ * Validates and fetches a OneNote resource, with helpful error messages for 404s.
+ * @param {string} id - The ID of the resource to validate and fetch.
+ * @param {string} resourceType - The type of resource (e.g., 'section', 'notebook', 'sectionGroup').
+ * @param {string} endpoint - The Graph API endpoint to fetch the resource.
+ * @param {string} [listToolSuggestion] - Optional suggestion for which tool to use to find valid IDs.
+ * @returns {Promise<object>} Object with {id: validatedId, resource: fetchedResource}.
+ * @throws {Error} If validation fails or resource is not found.
+ */
+async function validateAndFetchResource(id, resourceType, endpoint, listToolSuggestion) {
+  const validatedId = validateId(id, resourceType);
+
+  try {
+    const resource = await graphClient.api(endpoint).get();
+    return { id: validatedId, resource };
+  } catch (error) {
+    if (error.statusCode === 404) {
+      const suggestion =
+        listToolSuggestion ||
+        `list${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}s`;
+      throw new Error(
+        `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} with ID "${validatedId}" not found. Use ${suggestion} to find valid ${resourceType} IDs.`
+      );
+    }
+    throw error;
+  }
+}
+
 // ============================================================================
 // TOOL HANDLER WRAPPER
 // ============================================================================
@@ -682,22 +710,14 @@ server.tool(
     sectionId: z.string().describe('The ID of the section to list pages from.'),
   },
   createToolHandler(async ({ sectionId }) => {
-    // Validate the section ID
-    const validatedSectionId = validateId(sectionId, 'section');
-
-    // Verify the section exists and get its name
-    let sectionName;
-    try {
-      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
-      sectionName = sectionInfo.displayName;
-    } catch (error) {
-      if (error.statusCode === 404) {
-        throw new Error(
-          `Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`
-        );
-      }
-      throw error;
-    }
+    // Validate the section ID and fetch section info
+    const { id: validatedSectionId, resource: sectionInfo } = await validateAndFetchResource(
+      sectionId,
+      'section',
+      `/me/onenote/sections/${sectionId}`,
+      'listSections or searchSections'
+    );
+    const sectionName = sectionInfo.displayName;
 
     const response = await graphClient
       .api(`/me/onenote/sections/${validatedSectionId}/pages`)
@@ -1285,26 +1305,18 @@ server.tool(
       .describe('The content for the new page (HTML or markdown-style).'),
   },
   createToolHandler(async ({ sectionId, title, content }) => {
-    // Validate the section ID
-    const validatedSectionId = validateId(sectionId, 'section');
+    // Validate the section ID and fetch section info
+    const { id: validatedSectionId, resource: sectionInfo } = await validateAndFetchResource(
+      sectionId,
+      'section',
+      `/me/onenote/sections/${sectionId}`,
+      'listSections or searchSections'
+    );
+    const targetSectionName = sectionInfo.displayName;
 
     console.error(
       `Attempting to create page with title: "${title}" in section: ${validatedSectionId}`
     );
-
-    // Verify the section exists and get its name
-    let targetSectionName;
-    try {
-      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
-      targetSectionName = sectionInfo.displayName;
-    } catch (error) {
-      if (error.statusCode === 404) {
-        throw new Error(
-          `Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`
-        );
-      }
-      throw error;
-    }
 
     const htmlContent = textToHtml(content);
     const pageHtml = `<!DOCTYPE html>
@@ -1385,22 +1397,14 @@ server.tool(
       .describe('The name for the new section.'),
   },
   createToolHandler(async ({ notebookId, displayName }) => {
-    // Validate the notebook ID
-    const validatedNotebookId = validateId(notebookId, 'notebook');
+    // Validate the notebook ID and verify it exists
+    const { id: validatedNotebookId } = await validateAndFetchResource(
+      notebookId,
+      'notebook',
+      `/me/onenote/notebooks/${notebookId}`
+    );
 
     console.error(`Creating section "${displayName}" in notebook: ${validatedNotebookId}`);
-
-    // Verify the notebook exists
-    try {
-      await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
-    } catch (error) {
-      if (error.statusCode === 404) {
-        throw new Error(
-          `Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`
-        );
-      }
-      throw error;
-    }
 
     const response = await graphClient
       .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
@@ -1437,22 +1441,14 @@ server.tool(
       .describe('The name for the new section group.'),
   },
   createToolHandler(async ({ notebookId, displayName }) => {
-    // Validate the notebook ID
-    const validatedNotebookId = validateId(notebookId, 'notebook');
+    // Validate the notebook ID and verify it exists
+    const { id: validatedNotebookId } = await validateAndFetchResource(
+      notebookId,
+      'notebook',
+      `/me/onenote/notebooks/${notebookId}`
+    );
 
     console.error(`Creating section group "${displayName}" in notebook: ${validatedNotebookId}`);
-
-    // Verify the notebook exists
-    try {
-      await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
-    } catch (error) {
-      if (error.statusCode === 404) {
-        throw new Error(
-          `Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`
-        );
-      }
-      throw error;
-    }
 
     const response = await graphClient
       .api(`/me/onenote/notebooks/${validatedNotebookId}/sectionGroups`)
