@@ -3,6 +3,7 @@ import { createToolHandler } from '../api/retry.mjs';
 import { apiCache, CacheKeys } from '../api/cache.mjs';
 import { createPageHtml } from '../utils/html.mjs';
 import { validateAndFetchResource } from '../utils/validation.mjs';
+import { logger } from '../utils/logger.mjs';
 
 /**
  * Registers creation-related tools with the MCP server.
@@ -26,7 +27,7 @@ export function registerCreateTools(server, session) {
       session,
       async ({ title, content }) => {
         const graphClient = session.getGraphClient();
-        console.error(`Attempting to create page with title: "${title}"`);
+        logger.info(`Attempting to create page with title: "${title}"`);
 
         const sectionsResponse = await graphClient.api('/me/onenote/sections').get();
         if (!sectionsResponse.value || sectionsResponse.value.length === 0) {
@@ -88,7 +89,7 @@ export function registerCreateTools(server, session) {
         );
         const targetSectionName = sectionInfo.displayName;
 
-        console.error(
+        logger.info(
           `Attempting to create page with title: "${title}" in section: ${validatedSectionId}`
         );
 
@@ -128,7 +129,7 @@ export function registerCreateTools(server, session) {
       session,
       async ({ displayName }) => {
         const graphClient = session.getGraphClient();
-        console.error(`Creating notebook: "${displayName}"`);
+        logger.info(`Creating notebook: "${displayName}"`);
 
         const response = await graphClient.api('/me/onenote/notebooks').post({ displayName });
 
@@ -174,7 +175,7 @@ export function registerCreateTools(server, session) {
           `/me/onenote/notebooks/${notebookId}`
         );
 
-        console.error(`Creating section "${displayName}" in notebook: ${validatedNotebookId}`);
+        logger.info(`Creating section "${displayName}" in notebook: ${validatedNotebookId}`);
 
         const response = await graphClient
           .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
@@ -223,9 +224,7 @@ export function registerCreateTools(server, session) {
           `/me/onenote/notebooks/${notebookId}`
         );
 
-        console.error(
-          `Creating section group "${displayName}" in notebook: ${validatedNotebookId}`
-        );
+        logger.info(`Creating section group "${displayName}" in notebook: ${validatedNotebookId}`);
 
         const response = await graphClient
           .api(`/me/onenote/notebooks/${validatedNotebookId}/sectionGroups`)

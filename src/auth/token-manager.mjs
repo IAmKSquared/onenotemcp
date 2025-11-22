@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { encrypt } from './encryption.mjs';
+import { logger } from '../utils/logger.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -19,5 +20,5 @@ export async function saveToken(tokenData) {
   fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2), {
     mode: 0o600,
   });
-  console.error('🔒 Token saved securely (encrypted).');
+  logger.info('🔒 Token saved securely (encrypted)');
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { KeyStorage } from './key-storage.mjs';
 import { ENCRYPTION } from '../config/constants.mjs';
+import { logger } from '../utils/logger.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +29,7 @@ export async function getEncryptionKey() {
   // Generate new key
   const newKey = crypto.randomBytes(ENCRYPTION.KEY_LENGTH_BYTES);
   await keyStorage.setKey(newKey.toString('hex'));
-  console.error('🔑 Generated new encryption key and stored securely.');
+  logger.info('🔑 Generated new encryption key and stored securely.');
   return newKey;
 }
 

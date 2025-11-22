@@ -5,6 +5,7 @@
 
 import { JSDOM } from 'jsdom';
 import { VALIDATION, CACHE_CONFIG, DISPLAY_LIMITS } from '../config/constants.mjs';
+import { logger } from './logger.mjs';
 
 /**
  * Escapes single quotes in OData filter strings to prevent injection
@@ -95,7 +96,7 @@ export function extractTextSummary(html, maxLength = DISPLAY_LIMITS.SUMMARY_MAX_
     const summary = bodyText.substring(0, maxLength);
     return summary.length < bodyText.length ? `${summary}...` : summary;
   } catch (error) {
-    console.error(`Error extracting text summary: ${error.message}`);
+    logger.error({ err: error }, 'Error extracting text summary');
     return 'Could not extract text summary.';
   }
 }
@@ -148,7 +149,7 @@ export function extractReadableText(html) {
     }
     return text.trim();
   } catch (error) {
-    console.error(`Error extracting readable text: ${error.message}`);
+    logger.error({ err: error }, 'Error extracting readable text');
     return 'Error: Could not extract readable text from HTML content.';
   }
 }

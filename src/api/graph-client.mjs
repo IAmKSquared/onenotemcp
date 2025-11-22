@@ -1,5 +1,6 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { getAccessToken, loadExistingToken } from '../auth/token-manager.mjs';
+import { logger } from '../utils/logger.mjs';
 
 // --- Global State ---
 let graphClient = null;
@@ -16,7 +17,7 @@ export function initializeGraphClient() {
         done(null, accessToken);
       },
     });
-    console.error('Microsoft Graph client initialized.');
+    logger.info('Microsoft Graph client initialized');
   }
   return graphClient;
 }

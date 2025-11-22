@@ -1,6 +1,7 @@
 import keyringPkg from '@napi-rs/keyring';
 const { Entry } = keyringPkg;
 import fs from 'fs';
+import { logger } from '../utils/logger.mjs';
 
 const SERVICE_NAME = 'onenote-mcp';
 const KEY_NAME = 'encryption-key';
@@ -22,8 +23,7 @@ export class KeyStorage {
     try {
       this.entry = new Entry(SERVICE_NAME, KEY_NAME);
     } catch (error) {
-      console.error('⚠️ Warning: OS keychain unavailable, using encrypted file storage.');
-      console.error(`   Reason: ${error.message}`);
+      logger.warn({ err: error }, '⚠️ OS keychain unavailable, using encrypted file storage');
       this.useFallback = true;
     }
   }
@@ -59,8 +59,10 @@ export class KeyStorage {
     try {
       await this.entry.setPassword(keyHex);
     } catch (error) {
-      console.error(`⚠️ Failed to store key in OS keychain: ${error.message}`);
-      console.error('   Falling back to file storage.');
+      logger.warn(
+        { err: error },
+        '⚠️ Failed to store key in OS keychain, falling back to file storage'
+      );
       this.useFallback = true;
       return this._setKeyToFile(keyHex);
     }
@@ -116,10 +118,10 @@ export class KeyStorage {
       // Delete old file
       fs.unlinkSync(this.fallbackFilePath);
 
-      console.error('✅ Successfully migrated encryption key from file to OS keychain.');
+      logger.info('✅ Successfully migrated encryption key from file to OS keychain');
       return true;
     } catch (error) {
-      console.error(`⚠️ Failed to migrate key: ${error.message}`);
+      logger.warn({ err: error }, '⚠️ Failed to migrate key');
       return false;
     }
   }
@@ -137,7 +139,7 @@ export class KeyStorage {
     try {
       return fs.readFileSync(this.fallbackFilePath, 'utf8').trim();
     } catch (error) {
-      console.error(`Error reading key file: ${error.message}`);
+      logger.error({ err: error }, 'Error reading key file');
       return null;
     }
   }
@@ -166,7 +168,7 @@ export class KeyStorage {
       try {
         fs.unlinkSync(this.fallbackFilePath);
       } catch (error) {
-        console.error(`Error deleting key file: ${error.message}`);
+        logger.error({ err: error }, 'Error deleting key file');
       }
     }
   }

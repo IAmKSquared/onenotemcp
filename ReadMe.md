@@ -50,6 +50,10 @@ manipulation.
     sections).
   - Parallel API calls for multi-section queries to reduce latency.
   - Batch resource validation to minimize redundant API requests.
+- **Structured Logging:**
+  - Uses Pino for high-performance, structured JSON logging.
+  - Configurable log levels (trace, debug, info, warn, error, fatal).
+  - Pretty-printed output in development, JSON in production.
 
 ## Prerequisites
 
@@ -107,6 +111,7 @@ onenote-mcp-server/
 │   ├── utils/              # Shared utilities
 │   │   ├── common.mjs             # Core utilities (validation, conversion, cache)
 │   │   ├── html.mjs               # HTML formatting helpers
+│   │   ├── logger.mjs             # Pino structured logging
 │   │   └── validation.mjs         # Resource validation and fetching
 │   ├── config/             # Configuration
 │   │   └── constants.mjs          # Centralized constants (no magic numbers)
@@ -146,7 +151,26 @@ onenote-mcp-server/
       `src/auth/device-code-flow.mjs`, but using an environment variable is
       preferred.
 
-2.  **`.gitignore`:** The project includes a `.gitignore` file. Ensure it
+2.  **Logging Configuration (Optional):** The server uses Pino for structured
+    logging. You can configure logging behavior using environment variables:
+    - **LOG_LEVEL:** Set the minimum log level to output (default: `info`).
+      Available levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+
+      ```bash
+      export LOG_LEVEL=debug  # Enable debug-level logging
+      ```
+
+      (On Windows: `set LOG_LEVEL=debug`)
+
+    - **NODE_ENV:** Set to `production` to output logs in JSON format for better
+      parsing/analysis. In development (default), logs are pretty-printed with
+      colors and timestamps.
+
+      ```bash
+      export NODE_ENV=production
+      ```
+
+3.  **`.gitignore`:** The project includes a `.gitignore` file. Ensure it
     contains at least the following to prevent committing sensitive files:
     ```
     node_modules/

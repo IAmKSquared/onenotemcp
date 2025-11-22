@@ -1,6 +1,7 @@
 import { DeviceCodeCredential } from '@azure/identity';
 import { saveToken } from './token-manager.mjs';
 import { TIMEOUTS, AUTH_CONFIG } from '../config/constants.mjs';
+import { logger } from '../utils/logger.mjs';
 
 // --- Configuration ---
 const clientId = process.env.AZURE_CLIENT_ID || AUTH_CONFIG.DEFAULT_CLIENT_ID;
@@ -13,14 +14,14 @@ const scopes = AUTH_CONFIG.SCOPES;
  */
 export async function authenticateWithDeviceCode(session) {
   try {
-    console.error('Starting device code authentication...');
+    logger.info('Starting device code authentication...');
     let deviceCodeInfo = null;
 
     const credential = new DeviceCodeCredential({
       clientId: clientId,
       userPromptCallback: (info) => {
         deviceCodeInfo = info;
-        console.error(
+        logger.info(
           `\n=== AUTHENTICATION REQUIRED ===\n${info.message}\n================================\n`
         );
       },
@@ -55,7 +56,7 @@ export async function authenticateWithDeviceCode(session) {
         await saveToken(tokenData);
       })
       .catch((error) => {
-        console.error(`Background authentication failed: ${error.message}`);
+        logger.error({ err: error }, 'Background authentication failed');
       });
 
     return {

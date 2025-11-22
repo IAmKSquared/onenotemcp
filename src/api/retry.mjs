@@ -1,4 +1,5 @@
 import { HTTP_STATUS, NON_RETRYABLE_STATUS_CODES, RETRY_CONFIG } from '../config/constants.mjs';
+import { logger } from '../utils/logger.mjs';
 
 /**
  * Retry helper with exponential backoff for transient failures.
@@ -39,7 +40,7 @@ export async function retryWithBackoff(
 
       // Calculate delay with exponential backoff
       const delay = baseDelay * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt);
-      console.error(
+      logger.warn(
         `⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (Error: ${error.statusCode || error.code})`
       );
       await new Promise((resolve) => setTimeout(resolve, delay));

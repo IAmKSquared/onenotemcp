@@ -7,6 +7,7 @@ import { registerAuthTools } from './tools/auth-tools.mjs';
 import { registerReadTools } from './tools/read-tools.mjs';
 import { registerWriteTools } from './tools/write-tools.mjs';
 import { registerCreateTools } from './tools/create-tools.mjs';
+import { logger } from './utils/logger.mjs';
 
 // --- MCP Server Initialization ---
 const server = new McpServer({
@@ -36,35 +37,35 @@ async function main() {
     await server.connect(transport);
 
     const clientId = getClientId();
-    console.error('🚀✨ OneNote Ultimate MCP Server is now LIVE! ✨🚀');
-    console.error(
+    logger.info('🚀✨ OneNote Ultimate MCP Server is now LIVE! ✨🚀');
+    logger.info(
       `   Client ID: ${clientId.substring(0, 8)}... (Using ${process.env.AZURE_CLIENT_ID ? 'environment variable' : 'default'})`
     );
-    console.error('   Ready to manage your OneNote like never before!');
-    console.error('--- Available Tool Categories ---');
-    console.error('   🔐 Auth: authenticate, saveAccessToken');
-    console.error(
+    logger.info('   Ready to manage your OneNote like never before!');
+    logger.info('--- Available Tool Categories ---');
+    logger.info('   🔐 Auth: authenticate, saveAccessToken');
+    logger.info(
       '   📚 Read: listNotebooks, searchPages, getPageContent, getPageByTitle, listSections, listSectionGroups, searchSections'
     );
-    console.error(
+    logger.info(
       '   ✏️ Edit: updatePageContent, appendToPage, updatePageTitle, replaceTextInPage, addNoteToPage, addTableToPage'
     );
-    console.error(
+    logger.info(
       '   ➕ Create: createPage, createPageInSection, createNotebook, createSection, createSectionGroup'
     );
-    console.error('   📋 Manage: copyPage');
-    console.error('---------------------------------');
+    logger.info('   📋 Manage: copyPage');
+    logger.info('---------------------------------');
 
     process.on('SIGINT', () => {
-      console.error('\n🔌 OneNote MCP Server shutting down gracefully...');
+      logger.info('\n🔌 OneNote MCP Server shutting down gracefully...');
       process.exit(0);
     });
     process.on('SIGTERM', () => {
-      console.error('\n🔌 OneNote MCP Server terminated...');
+      logger.info('\n🔌 OneNote MCP Server terminated...');
       process.exit(0);
     });
   } catch (error) {
-    console.error(`💀 Critical error starting server: ${error.message}`, error.stack);
+    logger.fatal({ err: error }, '💀 Critical error starting server');
     process.exit(1);
   }
 }

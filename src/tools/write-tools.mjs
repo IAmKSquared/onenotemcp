@@ -4,6 +4,7 @@ import { patchPageContent } from '../utils/validation.mjs';
 import { textToHtml, validateId, validateCsvData } from '../utils/common.mjs';
 import { fetchPageContentAdvanced } from '../utils/validation.mjs';
 import { HTTP_STATUS } from '../config/constants.mjs';
+import { logger } from '../utils/logger.mjs';
 
 /**
  * Registers write/update-related tools with the MCP server.
@@ -29,7 +30,7 @@ export function registerWriteTools(server, session) {
         const validatedPageId = validateId(pageId, 'page');
 
         const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
-        console.error(`Updating content for page: "${pageInfo.title}" (ID: ${validatedPageId})`);
+        logger.info(`Updating content for page: "${pageInfo.title}" (ID: ${validatedPageId})`);
 
         const htmlContentForUpdate = textToHtml(newContent);
         const finalHtml = `
@@ -82,7 +83,7 @@ export function registerWriteTools(server, session) {
       async ({ pageId, content: newContent, addTimestamp, addSeparator }) => {
         const graphClient = session.getGraphClient();
         const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        console.error(`Appending content to page: "${pageInfo.title}" (ID: ${pageId})`);
+        logger.info(`Appending content to page: "${pageInfo.title}" (ID: ${pageId})`);
 
         const htmlContentToAppend = textToHtml(newContent);
         let appendHtml = '';
@@ -122,7 +123,7 @@ export function registerWriteTools(server, session) {
         const graphClient = session.getGraphClient();
         const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
         const oldTitle = pageInfo.title;
-        console.error(
+        logger.info(
           `Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`
         );
 
@@ -164,7 +165,7 @@ export function registerWriteTools(server, session) {
         const graphClient = session.getGraphClient();
         const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
         const htmlContent = await fetchPageContentAdvanced(session, pageId, 'httpDirect');
-        console.error(`Replacing text in page: "${pageInfo.title}" (ID: ${pageId})`);
+        logger.info(`Replacing text in page: "${pageInfo.title}" (ID: ${pageId})`);
 
         const flags = caseSensitive ? 'g' : 'gi';
         const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
@@ -223,7 +224,7 @@ export function registerWriteTools(server, session) {
       async ({ pageId, note, noteType, position }) => {
         const graphClient = session.getGraphClient();
         const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        console.error(
+        logger.info(
           `Adding ${noteType} to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`
         );
 
@@ -278,7 +279,7 @@ export function registerWriteTools(server, session) {
       async ({ pageId, tableData, title, position }) => {
         const graphClient = session.getGraphClient();
         const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        console.error(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
+        logger.info(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
 
         const rows = validateCsvData(tableData);
 
@@ -321,7 +322,7 @@ export function registerWriteTools(server, session) {
         const validatedPageId = validateId(pageId, 'page');
         const validatedSectionId = validateId(targetSectionId, 'section');
 
-        console.error(`Copying page ${validatedPageId} to section ${validatedSectionId}`);
+        logger.info(`Copying page ${validatedPageId} to section ${validatedSectionId}`);
 
         let pageInfo, targetSectionName;
         try {

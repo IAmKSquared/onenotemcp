@@ -1,4 +1,5 @@
 import { Cache } from '../utils/common.mjs';
+import { logger } from '../utils/logger.mjs';
 
 // Global cache instance
 export const apiCache = new Cache();
@@ -38,12 +39,12 @@ export async function cachedApiCall(cacheKey, apiCall, ttl) {
   // Check cache first
   const cached = apiCache.get(cacheKey);
   if (cached !== undefined) {
-    console.error(`✨ Cache hit: ${cacheKey}`);
+    logger.debug(`✨ Cache hit: ${cacheKey}`);
     return cached;
   }
 
   // Cache miss - make the API call
-  console.error(`🔄 Cache miss: ${cacheKey}`);
+  logger.debug(`🔄 Cache miss: ${cacheKey}`);
   const result = await apiCall();
 
   // Store in cache

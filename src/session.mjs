@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { decrypt } from './auth/encryption.mjs';
 import { TIME_CONVERSION } from './config/constants.mjs';
+import { logger } from './utils/logger.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +59,7 @@ export class OneNoteSession {
           done(null, this.accessToken);
         },
       });
-      console.error('Microsoft Graph client initialized.');
+      logger.info('Microsoft Graph client initialized');
     }
     return this.graphClient;
   }
@@ -99,16 +100,16 @@ export class OneNoteSession {
           const parsed = JSON.parse(fileContent);
           if (parsed.iv && parsed.encryptedData) {
             tokenDataStr = await decrypt(parsed);
-            console.error('🔓 Decrypted token successfully.');
+            logger.info('🔓 Decrypted token successfully');
           } else {
             // It's JSON but not encrypted (old format)
             tokenDataStr = fileContent;
-            console.error('⚠️  Loaded unencrypted token (legacy format).');
+            logger.warn('⚠️ Loaded unencrypted token (legacy format)');
           }
         } catch (_e) {
           // Not JSON, likely plain text token (very old format)
           tokenDataStr = fileContent;
-          console.error('⚠️  Loaded raw text token (legacy format).');
+          logger.warn('⚠️ Loaded raw text token (legacy format)');
         }
 
         try {
@@ -120,14 +121,15 @@ export class OneNoteSession {
             const now = new Date();
 
             if (expiryDate <= now) {
-              console.error('⚠️  Token has expired. Please re-authenticate.');
-              console.error(`   Expired on: ${expiryDate.toLocaleString()}`);
+              logger.warn(
+                `⚠️ Token has expired (expired on: ${expiryDate.toLocaleString()}). Please re-authenticate`
+              );
               return; // Don't set accessToken
             }
 
             const hoursUntilExpiry = Math.floor((expiryDate - now) / TIME_CONVERSION.MS_PER_HOUR);
             if (hoursUntilExpiry < 24) {
-              console.error(`⏰ Token expires in ${hoursUntilExpiry} hours`);
+              logger.warn(`⏰ Token expires in ${hoursUntilExpiry} hours`);
             }
           }
 
@@ -137,7 +139,7 @@ export class OneNoteSession {
         }
       }
     } catch (error) {
-      console.error(`Error loading token: ${error.message}`);
+      logger.error({ err: error }, 'Error loading token');
     }
   }
 
