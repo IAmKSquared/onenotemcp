@@ -9,6 +9,7 @@ import {
   extractTextSummary,
   extractReadableText,
 } from '../utils/common.mjs';
+import { DISPLAY_LIMITS } from '../config/constants.mjs';
 
 /**
  * Registers read-related tools with the MCP server.
@@ -356,7 +357,7 @@ export function registerReadTools(server, session) {
         if (format === 'html') {
           resultText = `📄 **${pageInfo.title}** (HTML Format)\n\n${htmlContent}`;
         } else if (format === 'summary') {
-          const summary = extractTextSummary(htmlContent, 300);
+          const summary = extractTextSummary(htmlContent);
           resultText = `📄 **${pageInfo.title}** (Summary)\n\n${summary}`;
         } else {
           const textContent = extractReadableText(htmlContent);
@@ -417,7 +418,7 @@ export function registerReadTools(server, session) {
         if (format === 'html') {
           resultText = `📄 **${matchingPage.title}** (HTML Format)\n\n${htmlContent}`;
         } else if (format === 'summary') {
-          const summary = extractTextSummary(htmlContent, 300);
+          const summary = extractTextSummary(htmlContent);
           resultText = `📄 **${matchingPage.title}** (Summary)\n\n${summary}`;
         } else {
           const textContent = extractReadableText(htmlContent);
@@ -426,8 +427,8 @@ export function registerReadTools(server, session) {
 
         if (matchingPages.length > 1) {
           resultText += `\n\n📌 Note: ${matchingPages.length} pages matched "${title}". Showing the first match.`;
-          if (matchingPages.length === 50) {
-            resultText += `\n⚠️ Reached the 50-result limit. There may be additional matches not shown.`;
+          if (matchingPages.length === DISPLAY_LIMITS.API_RESULT_LIMIT) {
+            resultText += `\n⚠️ Reached the ${DISPLAY_LIMITS.API_RESULT_LIMIT}-result limit. There may be additional matches not shown.`;
           }
         }
 

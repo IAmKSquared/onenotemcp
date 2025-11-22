@@ -1,3 +1,5 @@
+import { HTTP_STATUS, NON_RETRYABLE_STATUS_CODES, RETRY_CONFIG } from '../config/constants.mjs';
+
 /**
  * Retry helper with exponential backoff for transient failures.
  * @param {Function} fn - The async function to retry.
@@ -5,7 +7,11 @@
  * @param {number} baseDelay - Base delay in milliseconds for exponential backoff.
  * @returns {Promise} The result of the function call.
  */
-export async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+export async function retryWithBackoff(
+  fn,
+  maxRetries = RETRY_CONFIG.MAX_RETRIES,
+  baseDelay = RETRY_CONFIG.BASE_DELAY_MS
+) {
   let lastError;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -15,15 +21,15 @@ export async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
       lastError = error;
 
       // Don't retry on these errors
-      const nonRetryableErrors = [400, 401, 403, 404, 409];
-      if (error.statusCode && nonRetryableErrors.includes(error.statusCode)) {
+      if (error.statusCode && NON_RETRYABLE_STATUS_CODES.includes(error.statusCode)) {
         throw error;
       }
 
       // Retry on rate limits (429) and server errors (500+)
       const shouldRetry =
-        error.statusCode === 429 || // Rate limit
-        (error.statusCode >= 500 && error.statusCode < 600) || // Server errors
+        error.statusCode === HTTP_STATUS.RATE_LIMIT ||
+        (error.statusCode >= HTTP_STATUS.SERVER_ERROR_MIN &&
+          error.statusCode < HTTP_STATUS.SERVER_ERROR_MAX) ||
         error.code === 'ETIMEDOUT' || // Timeout
         error.code === 'ECONNRESET'; // Connection reset
 
@@ -32,7 +38,7 @@ export async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
       }
 
       // Calculate delay with exponential backoff
-      const delay = baseDelay * Math.pow(2, attempt);
+      const delay = baseDelay * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt);
       console.error(
         `⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (Error: ${error.statusCode || error.code})`
       );
@@ -55,7 +61,7 @@ export function getDetailedErrorMessage(error, errorPrefix) {
 
   // Authentication errors
   if (
-    statusCode === 401 ||
+    statusCode === HTTP_STATUS.UNAUTHORIZED ||
     errorMessage.includes('authenticate') ||
     errorMessage.includes('Access token')
   ) {
@@ -63,22 +69,22 @@ export function getDetailedErrorMessage(error, errorPrefix) {
   }
 
   // Permission errors
-  if (statusCode === 403) {
+  if (statusCode === HTTP_STATUS.FORBIDDEN) {
     return `🔒 **Permission Denied**\nYou don't have permission to perform this action. Ensure your account has the required OneNote permissions (Notes.Read, Notes.ReadWrite, Notes.Create).`;
   }
 
   // Not found errors
-  if (statusCode === 404) {
+  if (statusCode === HTTP_STATUS.NOT_FOUND) {
     return `❌ **Resource Not Found**\n${errorMessage}\n\nThe requested item doesn't exist. It may have been deleted or the ID is incorrect.`;
   }
 
   // Rate limit errors
-  if (statusCode === 429) {
+  if (statusCode === HTTP_STATUS.RATE_LIMIT) {
     return `⏱️ **Rate Limit Exceeded**\nToo many requests. Please wait a moment before trying again. (All retry attempts exhausted)`;
   }
 
   // Server errors
-  if (statusCode >= 500 && statusCode < 600) {
+  if (statusCode >= HTTP_STATUS.SERVER_ERROR_MIN && statusCode < HTTP_STATUS.SERVER_ERROR_MAX) {
     return `🔧 **Server Error** (${statusCode})\nMicrosoft's OneNote service is experiencing issues. Please try again in a few moments. (All retry attempts exhausted)`;
   }
 

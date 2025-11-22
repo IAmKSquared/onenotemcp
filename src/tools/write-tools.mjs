@@ -3,6 +3,7 @@ import { createToolHandler } from '../api/retry.mjs';
 import { patchPageContent } from '../utils/validation.mjs';
 import { textToHtml, validateId, validateCsvData } from '../utils/common.mjs';
 import { fetchPageContentAdvanced } from '../utils/validation.mjs';
+import { HTTP_STATUS } from '../config/constants.mjs';
 
 /**
  * Registers write/update-related tools with the MCP server.
@@ -331,7 +332,7 @@ export function registerWriteTools(server, session) {
           pageInfo = pageResult;
           targetSectionName = sectionResult.displayName;
         } catch (error) {
-          if (error.statusCode === 404) {
+          if (error.statusCode === HTTP_STATUS.NOT_FOUND) {
             if (error.message && error.message.includes('section')) {
               throw new Error(
                 `Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`

@@ -4,6 +4,7 @@
  */
 
 import { JSDOM } from 'jsdom';
+import { VALIDATION, CACHE_CONFIG, DISPLAY_LIMITS } from '../config/constants.mjs';
 
 /**
  * Escapes single quotes in OData filter strings to prevent injection
@@ -32,7 +33,7 @@ export function sanitizeUrl(url) {
 
 /**
  * Validates resource IDs to prevent injection attacks.
- * Microsoft Graph IDs are typically 20-100 characters, but we allow 10-200 for flexibility.
+ * Microsoft Graph IDs are typically 20-100 characters, but we allow flexibility.
  * @param {string} id - The ID to validate
  * @param {string} type - The resource type (for error messages)
  * @throws {Error} If ID is invalid
@@ -49,9 +50,11 @@ export function validateId(id, type = 'resource') {
     throw new Error(`Invalid ${type} ID: ID cannot be empty or whitespace.`);
   }
 
-  // Microsoft Graph IDs are typically 20-100 chars, allow 10-200 for flexibility
-  if (trimmedId.length < 10 || trimmedId.length > 200) {
-    throw new Error(`Invalid ${type} ID: ID length out of expected range (10-200 characters).`);
+  // Microsoft Graph IDs are typically 20-100 chars, allow flexibility
+  if (trimmedId.length < VALIDATION.ID_MIN_LENGTH || trimmedId.length > VALIDATION.ID_MAX_LENGTH) {
+    throw new Error(
+      `Invalid ${type} ID: ID length out of expected range (${VALIDATION.ID_MIN_LENGTH}-${VALIDATION.ID_MAX_LENGTH} characters).`
+    );
   }
 
   // Comprehensive security checks combining both implementations
@@ -82,7 +85,7 @@ export function validateId(id, type = 'resource') {
  * @param {number} [maxLength] - The maximum length of the summary
  * @returns {string} A text summary
  */
-export function extractTextSummary(html, maxLength = 300) {
+export function extractTextSummary(html, maxLength = DISPLAY_LIMITS.SUMMARY_MAX_LENGTH) {
   try {
     if (!html) return 'No content to summarize.';
     const dom = new JSDOM(html);
@@ -215,11 +218,11 @@ export function textToHtml(text) {
  */
 export class Cache {
   /**
-   * Creates a new Cache instance with default 5-minute TTL
+   * Creates a new Cache instance with default TTL
    */
   constructor() {
     this.cache = new Map();
-    this.defaultTTL = 5 * 60 * 1000; // 5 minutes default
+    this.defaultTTL = CACHE_CONFIG.DEFAULT_TTL_MS;
   }
 
   /**
@@ -243,7 +246,7 @@ export class Cache {
    * Stores a value in the cache with an optional TTL
    * @param {string} key - The cache key
    * @param {*} value - The value to cache
-   * @param {number} [ttl] - Time to live in milliseconds (defaults to 5 minutes)
+   * @param {number} [ttl] - Time to live in milliseconds (defaults to configured TTL)
    */
   set(key, value, ttl) {
     const expiry = Date.now() + (ttl || this.defaultTTL);
@@ -305,7 +308,7 @@ export function validateCsvData(csvString) {
     .filter((row) => row.length > 0);
 
   // Validate minimum rows (header + at least one data row)
-  if (rows.length < 2) {
+  if (rows.length < VALIDATION.CSV_MIN_ROWS) {
     throw new Error('Table data must have at least a header row and one data row.');
   }
 

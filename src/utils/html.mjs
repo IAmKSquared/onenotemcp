@@ -1,4 +1,5 @@
 import { textToHtml } from '../utils/common.mjs';
+import { DISPLAY_LIMITS } from '../config/constants.mjs';
 
 /**
  * Formats OneNote page information for display.
@@ -13,14 +14,19 @@ export function formatPageInfo(page, index = null) {
 }
 
 /**
- * Formats a list of items with pagination display (first 10 items + "X more" message).
+ * Formats a list of items with pagination display + "X more" message.
  * @param {Array} items - The array of items to format.
  * @param {string} [itemType] - The type of items (e.g., 'pages', 'sections'). Defaults to 'items'.
- * @param {number} [maxDisplay] - Maximum number of items to display. Defaults to 10.
- * @param {number} [apiLimit] - The API result limit to check for warning. Defaults to 50.
+ * @param {number} [maxDisplay] - Maximum number of items to display.
+ * @param {number} [apiLimit] - The API result limit to check for warning.
  * @returns {object} Object with {list, more, limitWarning} strings.
  */
-export function formatItemList(items, itemType = 'items', maxDisplay = 10, apiLimit = 50) {
+export function formatItemList(
+  items,
+  itemType = 'items',
+  maxDisplay = DISPLAY_LIMITS.MAX_DISPLAY_ITEMS,
+  apiLimit = DISPLAY_LIMITS.API_RESULT_LIMIT
+) {
   const displayItems = items.slice(0, maxDisplay);
   const list = displayItems.map((item, i) => formatPageInfo(item, i)).join('\n\n');
   const more =

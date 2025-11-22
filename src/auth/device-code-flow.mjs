@@ -1,5 +1,6 @@
 import { DeviceCodeCredential } from '@azure/identity';
 import { saveToken } from './token-manager.mjs';
+import { TIMEOUTS } from '../config/constants.mjs';
 
 // --- Configuration ---
 const clientId = process.env.AZURE_CLIENT_ID || '14d82eec-204b-4c2f-b7e8-296a70dab67e'; // Default: Microsoft Graph Explorer App ID
@@ -26,7 +27,7 @@ export async function authenticateWithDeviceCode(session) {
     });
 
     const authPromise = credential.getToken(scopes);
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Allow time for userPromptCallback
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.DEVICE_CODE_CALLBACK_MS)); // Allow time for userPromptCallback
 
     if (!deviceCodeInfo) {
       return {

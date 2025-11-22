@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { decrypt } from './auth/encryption.mjs';
+import { TIME_CONVERSION } from './config/constants.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,7 +125,7 @@ export class OneNoteSession {
               return; // Don't set accessToken
             }
 
-            const hoursUntilExpiry = Math.floor((expiryDate - now) / (1000 * 60 * 60));
+            const hoursUntilExpiry = Math.floor((expiryDate - now) / TIME_CONVERSION.MS_PER_HOUR);
             if (hoursUntilExpiry < 24) {
               console.error(`⏰ Token expires in ${hoursUntilExpiry} hours`);
             }

@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { validateId } from '../utils/common.mjs';
+import { HTTP_STATUS } from '../config/constants.mjs';
 
 /**
  * Fetches the content of a OneNote page.
@@ -84,7 +85,7 @@ export async function validateAndFetchResource(
     const resource = await graphClient.api(endpoint).get();
     return { id: validatedId, resource };
   } catch (error) {
-    if (error.statusCode === 404) {
+    if (error.statusCode === HTTP_STATUS.NOT_FOUND) {
       const suggestion =
         listToolSuggestion ||
         `list${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}s`;

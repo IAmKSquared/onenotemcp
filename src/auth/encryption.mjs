@@ -2,15 +2,13 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { KeyStorage } from './key-storage.mjs';
+import { ENCRYPTION } from '../config/constants.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const keyFilePath = path.join(__dirname, '..', '..', '.local-secret-key');
 
-// --- Encryption Configuration ---
-const ALGORITHM = 'aes-256-cbc';
-const IV_LENGTH = 16;
 const keyStorage = new KeyStorage(keyFilePath);
 
 /**
@@ -28,7 +26,7 @@ export async function getEncryptionKey() {
   }
 
   // Generate new key
-  const newKey = crypto.randomBytes(32);
+  const newKey = crypto.randomBytes(ENCRYPTION.KEY_LENGTH_BYTES);
   await keyStorage.setKey(newKey.toString('hex'));
   console.error('🔑 Generated new encryption key and stored securely.');
   return newKey;
@@ -41,8 +39,8 @@ export async function getEncryptionKey() {
  */
 export async function encrypt(text) {
   const key = await getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const iv = crypto.randomBytes(ENCRYPTION.IV_LENGTH_BYTES);
+  const cipher = crypto.createCipheriv(ENCRYPTION.ALGORITHM, key, iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return { iv: iv.toString('hex'), encryptedData: encrypted.toString('hex') };
@@ -57,7 +55,7 @@ export async function decrypt(text) {
   const key = await getEncryptionKey();
   const iv = Buffer.from(text.iv, 'hex');
   const encryptedText = Buffer.from(text.encryptedData, 'hex');
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  const decipher = crypto.createDecipheriv(ENCRYPTION.ALGORITHM, key, iv);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
