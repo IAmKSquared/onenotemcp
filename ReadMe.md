@@ -395,10 +395,20 @@ manual intervention.
 
 ## Security Notes
 
-- **Access Token Security:** The `.access-token.txt` file contains a token that
-  grants access to your OneNote data according to the defined scopes. Protect
-  this file as you would any sensitive credential. Ensure it is included in your
-  `.gitignore` file.
+- **Encryption Key Storage:** The server uses OS-native secure storage for
+  encryption keys:
+  - **Windows**: Windows Credential Manager (DPAPI)
+  - **macOS**: Keychain Services
+  - **Linux**: Secret Service API (gnome-keyring/KWallet)
+  - **Fallback**: If OS keychain is unavailable, encrypted file storage is used
+    with a warning message.
+  - **Migration**: Existing file-based keys are automatically migrated to the OS
+    keychain on first startup.
+- **Access Token Security:** The `.access-token.txt` file contains an encrypted
+  token that grants access to your OneNote data according to the defined scopes.
+  The token is encrypted using AES-256-CBC with a key stored securely in your OS
+  keychain. Protect this file as you would any sensitive credential. Ensure it
+  is included in your `.gitignore` file.
 - **Azure Client ID:** If you create your own Azure App Registration, keep its
   client secret (if any generated for other flows) secure. For this device code
   flow, a client secret is not used by this script.

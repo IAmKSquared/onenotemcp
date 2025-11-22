@@ -17,6 +17,7 @@ import {
   extractTextSummary,
   extractReadableText,
 } from './utils.mjs';
+import { KeyStorage } from './key-storage.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +30,7 @@ const scopes = ['Notes.Read', 'Notes.ReadWrite', 'Notes.Create', 'User.Read'];
 const keyFilePath = path.join(__dirname, '.local-secret-key');
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
+const keyStorage = new KeyStorage(keyFilePath);
 
 // --- Global State ---
 let accessToken = null;
@@ -46,29 +48,35 @@ const server = new McpServer({
 // ============================================================================
 
 /**
- * Retrieves or generates the encryption key.
- * @returns {Buffer} The 32-byte encryption key.
+ * Retrieves or generates the encryption key from secure storage.
+ * @returns {Promise<Buffer>} The 32-byte encryption key.
  */
-function getEncryptionKey() {
-  if (fs.existsSync(keyFilePath)) {
-    const hexKey = fs.readFileSync(keyFilePath, 'utf8').trim();
-    return Buffer.from(hexKey, 'hex');
-  } else {
-    const newKey = crypto.randomBytes(32);
-    fs.writeFileSync(keyFilePath, newKey.toString('hex'), { mode: 0o600 }); // Secure permissions
-    console.error('🔑 Generated new secure encryption key.');
-    return newKey;
+async function getEncryptionKey() {
+  // Attempt migration from file-based to keyring storage
+  await keyStorage.migrate();
+
+  // Try to get existing key
+  const existingKey = await keyStorage.getKey();
+  if (existingKey) {
+    return Buffer.from(existingKey, 'hex');
   }
+
+  // Generate new key
+  const newKey = crypto.randomBytes(32);
+  await keyStorage.setKey(newKey.toString('hex'));
+  console.error('🔑 Generated new encryption key and stored securely.');
+  return newKey;
 }
 
 /**
  * Encrypts text using AES-256-CBC.
  * @param {string} text - The text to encrypt.
- * @returns {object} The encrypted data { iv, encryptedData }.
+ * @returns {Promise<object>} The encrypted data { iv, encryptedData }.
  */
-function encrypt(text) {
+async function encrypt(text) {
+  const key = await getEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, getEncryptionKey(), iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return { iv: iv.toString('hex'), encryptedData: encrypted.toString('hex') };
@@ -77,12 +85,13 @@ function encrypt(text) {
 /**
  * Decrypts text using AES-256-CBC.
  * @param {object} text - The encrypted data object { iv, encryptedData }.
- * @returns {string} The decrypted text.
+ * @returns {Promise<string>} The decrypted text.
  */
-function decrypt(text) {
+async function decrypt(text) {
+  const key = await getEncryptionKey();
   const iv = Buffer.from(text.iv, 'hex');
   const encryptedText = Buffer.from(text.encryptedData, 'hex');
-  const decipher = crypto.createDecipheriv(ALGORITHM, getEncryptionKey(), iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
@@ -90,8 +99,9 @@ function decrypt(text) {
 
 /**
  * Loads an existing access token from the local file system.
+ * @returns {Promise<void>}
  */
-function loadExistingToken() {
+async function loadExistingToken() {
   try {
     if (fs.existsSync(tokenFilePath)) {
       const fileContent = fs.readFileSync(tokenFilePath, 'utf8');
@@ -101,7 +111,7 @@ function loadExistingToken() {
         // Try to parse as JSON first to see if it's our encrypted format
         const parsed = JSON.parse(fileContent);
         if (parsed.iv && parsed.encryptedData) {
-          tokenDataStr = decrypt(parsed);
+          tokenDataStr = await decrypt(parsed);
           console.error('🔓 Decrypted token successfully.');
         } else {
           // It's JSON but not encrypted (old format)
@@ -168,7 +178,7 @@ function initializeGraphClient() {
  */
 async function ensureGraphClient() {
   if (!accessToken) {
-    loadExistingToken();
+    await loadExistingToken();
   }
   if (!accessToken) {
     throw new Error(
@@ -543,7 +553,7 @@ Please complete the following steps:
 Token will be saved automatically upon successful browser authentication.`;
 
       authPromise
-        .then((tokenResponse) => {
+        .then(async (tokenResponse) => {
           accessToken = tokenResponse.token;
           const tokenData = {
             token: accessToken,
@@ -556,7 +566,7 @@ Token will be saved automatically upon successful browser authentication.`;
           };
 
           // Encrypt before saving
-          const encryptedToken = encrypt(JSON.stringify(tokenData));
+          const encryptedToken = await encrypt(JSON.stringify(tokenData));
           fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2));
           console.error('🔒 Token saved securely (encrypted).');
           initializeGraphClient();
@@ -587,7 +597,7 @@ Token will be saved automatically upon successful browser authentication.`;
 
 server.tool('saveAccessToken', {}, async () => {
   try {
-    loadExistingToken();
+    await loadExistingToken();
     if (accessToken) {
       initializeGraphClient();
       const testResponse = await graphClient.api('/me').get();
@@ -1556,7 +1566,7 @@ server.tool(
  * Main function to initialize and start the MCP server.
  */
 async function main() {
-  loadExistingToken(); // Attempt to load token at startup
+  await loadExistingToken(); // Attempt to load token at startup
   if (accessToken) {
     initializeGraphClient(); // Initialize client if token was loaded
   }
