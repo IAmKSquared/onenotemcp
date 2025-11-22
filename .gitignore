@@ -32,3 +32,4 @@ Thumbs.db
 *.swp
 *~
 .local-secret-key
+.claude/settings.local.json

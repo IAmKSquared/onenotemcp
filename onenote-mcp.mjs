@@ -669,17 +669,74 @@ server.tool(
 server.tool(
   'searchPages',
   {
-    query: z.string().describe('The search term for page titles.').optional()
+    query: z.string().describe('The search term for page titles.').optional(),
+    modifiedAfter: z.string().describe('Filter pages modified after this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).').optional(),
+    modifiedBefore: z.string().describe('Filter pages modified before this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).').optional(),
+    notebookId: z.string().describe('Filter pages within a specific notebook (must provide notebook ID).').optional()
   },
-  createToolHandler(async ({ query }) => {
-    let request = graphClient.api('/me/onenote/pages')
-      .select('id,title,lastModifiedDateTime')
-      .top(50);
+  createToolHandler(async ({ query, modifiedAfter, modifiedBefore, notebookId }) => {
+    // Build filter conditions
+    const filterConditions = [];
 
     if (query) {
       // Escape the query to prevent OData injection and convert to lowercase for case-insensitive search
       const escapedQuery = escapeODataString(query).toLowerCase();
-      request = request.filter(`contains(tolower(title), '${escapedQuery}')`);
+      filterConditions.push(`contains(tolower(title), '${escapedQuery}')`);
+    }
+
+    if (modifiedAfter) {
+      filterConditions.push(`lastModifiedDateTime ge ${modifiedAfter}`);
+    }
+
+    if (modifiedBefore) {
+      filterConditions.push(`lastModifiedDateTime le ${modifiedBefore}`);
+    }
+
+    // If notebook filtering is requested, we need to get sections first, then pages
+    if (notebookId) {
+      const validatedNotebookId = validateId(notebookId, 'notebook');
+      const sectionsResponse = await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}/sections`).get();
+      const sections = sectionsResponse.value || [];
+
+      if (sections.length === 0) {
+        return { content: [{ type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` }] };
+      }
+
+      // Get pages from all sections in this notebook
+      const allPages = [];
+      for (const section of sections) {
+        let sectionRequest = graphClient.api(`/me/onenote/sections/${section.id}/pages`)
+          .select('id,title,lastModifiedDateTime')
+          .top(50);
+
+        if (filterConditions.length > 0) {
+          sectionRequest = sectionRequest.filter(filterConditions.join(' and '));
+        }
+
+        const sectionPages = await sectionRequest.get();
+        allPages.push(...(sectionPages.value || []));
+      }
+
+      const pages = allPages.slice(0, 50); // Limit to 50 total
+
+      if (pages.length > 0) {
+        const displayPages = pages.slice(0, 10);
+        const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
+        const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
+        const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
+        return { content: [{ type: 'text', text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+      } else {
+        return { content: [{ type: 'text', text: `🔍 No pages found in notebook matching criteria.` }] };
+      }
+    }
+
+    // Standard search across all pages
+    let request = graphClient.api('/me/onenote/pages')
+      .select('id,title,lastModifiedDateTime')
+      .top(50);
+
+    if (filterConditions.length > 0) {
+      request = request.filter(filterConditions.join(' and '));
     }
 
     const apiResponse = await request.get();
@@ -691,9 +748,15 @@ server.tool(
       const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
       const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
       const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
-      return { content: [{ type: 'text', text: `🔍 **Search Results** ${query ? `for "${query}"` : ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+
+      let searchDesc = '';
+      if (query) searchDesc += `"${query}"`;
+      if (modifiedAfter) searchDesc += ` modified after ${modifiedAfter}`;
+      if (modifiedBefore) searchDesc += ` modified before ${modifiedBefore}`;
+
+      return { content: [{ type: 'text', text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
     } else {
-      return { content: [{ type: 'text', text: query ? `🔍 No pages found matching "${query}".` : '📄 No pages found.' }] };
+      return { content: [{ type: 'text', text: `🔍 No pages found matching criteria.` }] };
     }
   }, 'Failed to search pages')
 );

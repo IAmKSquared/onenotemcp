@@ -11,7 +11,8 @@ This server provides a rich set of tools for advanced OneNote management, includ
 *   **Authentication:** Secure device code flow for Microsoft Graph API access.
 *   **Read Operations:**
     *   List notebooks, sections, section groups, and pages within sections.
-    *   Search sections by name and pages by title.
+    *   Search sections by name and pages by title with advanced filtering.
+    *   Filter pages by modification date ranges and specific notebooks.
     *   Get page content in various formats (full HTML, readable text, summary).
 *   **Write & Edit Operations:**
     *   Create new OneNote pages with custom HTML or markdown content.
@@ -145,7 +146,7 @@ This server exposes the following tools to your AI assistant:
 *   `listSectionGroups`: Lists section groups, optionally filtered by notebook or parent section group. (Args: `notebookId` (optional string), `sectionGroupId` (optional string))
 *   `searchSections`: Searches for sections by name. (Arg: `query` (string))
 *   `listPagesInSection`: Lists all pages within a specific section. (Arg: `sectionId` (string))
-*   `searchPages`: Searches for pages by title across all notebooks. (Arg: `query` (optional string))
+*   `searchPages`: Searches for pages by title with optional date and notebook filtering. (Args: `query` (optional string), `modifiedAfter` (optional ISO 8601 date), `modifiedBefore` (optional ISO 8601 date), `notebookId` (optional string))
 *   `getPageContent`: Retrieves the content of a specific OneNote page. (Args: `pageId` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 *   `getPageByTitle`: Finds a page by its title and retrieves its content. (Args: `title` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 
@@ -167,6 +168,9 @@ Once connected and authenticated, you can ask your AI assistant to perform tasks
 *   "Show me all sections in my notebook."
 *   "Search for sections containing 'Project'."
 *   "Show me all pages in the 'Meeting Notes' section."
+*   "Find all pages modified after 2024-01-01."
+*   "Search for pages with 'budget' in the title that were modified in the last week."
+*   "Show me all pages in a specific notebook that contain 'meeting' in the title."
 *   "Create a new OneNote page titled 'Meeting Ideas' with the content 'Brainstorm new marketing strategies'."
 *   "Create a page titled 'Action Items' in the 'Work Projects' section."
 *   "Can you find my OneNote page about 'Project Phoenix' and tell me its summary?"
