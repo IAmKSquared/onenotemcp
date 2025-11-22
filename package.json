@@ -5,7 +5,11 @@
   "main": "onenote-mcp.mjs",
   "type": "module",
   "scripts": {
-    "start": "node onenote-mcp.mjs"
+    "start": "node onenote-mcp.mjs",
+    "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
+    "test:unit": "node --test test_unit.mjs",
+    "test:smoke": "node test_smoke.mjs",
+    "test:integration": "node test_integration.mjs"
   },
   "repository": {
     "type": "git",

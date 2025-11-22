@@ -49,11 +49,20 @@ function handleResponse(response) {
         const toolNames = tools.map(t => t.name);
         console.log('Available tools:', toolNames);
 
-        const expectedTools = ['listSections', 'listSectionGroups', 'searchSections'];
+        const expectedTools = [
+            // Section tools
+            'listSections', 'listSectionGroups', 'searchSections',
+            // Creation tools
+            'createNotebook', 'createSection', 'createSectionGroup',
+            // Page management
+            'copyPage',
+            // Advanced editing
+            'replaceTextInPage', 'addNoteToPage', 'addTableToPage'
+        ];
         const missing = expectedTools.filter(t => !toolNames.includes(t));
 
         if (missing.length === 0) {
-            console.log('✅ All new section tools are present.');
+            console.log(`✅ All ${expectedTools.length} expected tools are present.`);
             // Call listSections
             sendRequest('tools/call', { name: 'listSections', arguments: {} });
         } else {
@@ -77,8 +86,23 @@ function handleResponse(response) {
             console.error('❌ searchSections failed:', response.error);
         } else {
             console.log('✅ searchSections response received.');
-            // console.log(response.result.content[0].text);
-            console.log('🎉 Verification Complete!');
+            // Test searchPages with date filtering
+            const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            sendRequest('tools/call', {
+                name: 'searchPages',
+                arguments: {
+                    query: '',
+                    modifiedAfter: oneWeekAgo
+                }
+            });
+        }
+    } else if (response.id === 4) {
+        // searchPages with date filter response
+        if (response.error) {
+            console.error('❌ searchPages with date filter failed:', response.error);
+        } else {
+            console.log('✅ searchPages with date filter response received.');
+            console.log('🎉 Integration Test Complete!');
             process.exit(0);
         }
     }

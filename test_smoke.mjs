@@ -33,17 +33,46 @@ server.stdout.on('data', (data) => {
                     const toolNames = tools.map(t => t.name);
                     console.log('Tools found:', toolNames);
 
-                    const hasAuthenticate = toolNames.includes('authenticate');
-                    const hasListNotebooks = toolNames.includes('listNotebooks');
-                    const hasGetPageContent = toolNames.includes('getPageContent');
+                    // Critical tools to verify
+                    const expectedTools = [
+                        // Authentication
+                        'authenticate',
+                        'saveAccessToken',
+                        // Reading
+                        'listNotebooks',
+                        'listSections',
+                        'listSectionGroups',
+                        'searchSections',
+                        'listPagesInSection',
+                        'searchPages',
+                        'getPageContent',
+                        'getPageByTitle',
+                        // Creating Structure
+                        'createNotebook',
+                        'createSection',
+                        'createSectionGroup',
+                        // Page Creation & Editing
+                        'createPage',
+                        'createPageInSection',
+                        'updatePageContent',
+                        'appendToPage',
+                        'updatePageTitle',
+                        'replaceTextInPage',
+                        'addNoteToPage',
+                        'addTableToPage',
+                        // Page Management
+                        'copyPage'
+                    ];
 
-                    if (hasAuthenticate && hasListNotebooks && hasGetPageContent) {
-                        console.log('✅ Verification PASSED: All critical tools found.');
+                    const missing = expectedTools.filter(tool => !toolNames.includes(tool));
+
+                    if (missing.length === 0) {
+                        console.log(`✅ Verification PASSED: All ${expectedTools.length} expected tools found.`);
                         process.exit(0);
                     } else {
-                        console.error('❌ Verification FAILED: Missing tools.');
-                        console.error(`Expected authenticate: ${hasAuthenticate}`);
-                        console.error(`Expected listNotebooks: ${hasListNotebooks}`);
+                        console.error('❌ Verification FAILED: Missing tools:');
+                        missing.forEach(tool => console.error(`  - ${tool}`));
+                        console.error(`\nFound ${toolNames.length} tools, expected ${expectedTools.length}`);
                         process.exit(1);
                     }
                 }
