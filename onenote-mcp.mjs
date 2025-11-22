@@ -542,7 +542,8 @@ server.tool(
       const displaySections = sections.slice(0, 10);
       const list = displaySections.map((item, i) => formatPageInfo(item, i)).join('\n\n');
       const more = sections.length > 10 ? `\n\n... and ${sections.length - 10} more.` : '';
-      return { content: [{ type: 'text', text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}` }] };
+      const limitWarning = sections.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
+      return { content: [{ type: 'text', text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}${limitWarning}` }] };
     } else {
       return { content: [{ type: 'text', text: `🔍 No sections found matching "${query}".` }] };
     }
@@ -573,7 +574,8 @@ server.tool(
       const displayPages = pages.slice(0, 10);
       const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
       const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      return { content: [{ type: 'text', text: `🔍 **Search Results** ${query ? `for "${query}"` : ''} (${pages.length} found):\n\n${pageList}${more}` }] };
+      const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
+      return { content: [{ type: 'text', text: `🔍 **Search Results** ${query ? `for "${query}"` : ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
     } else {
       return { content: [{ type: 'text', text: query ? `🔍 No pages found matching "${query}".` : '📄 No pages found.' }] };
     }
@@ -655,6 +657,9 @@ server.tool(
     // If multiple matches, add a note
     if (matchingPages.length > 1) {
       resultText += `\n\n📌 Note: ${matchingPages.length} pages matched "${title}". Showing the first match.`;
+      if (matchingPages.length === 50) {
+        resultText += `\n⚠️ Reached the 50-result limit. There may be additional matches not shown.`;
+      }
     }
 
     return { content: [{ type: 'text', text: resultText }] };
