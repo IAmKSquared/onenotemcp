@@ -189,6 +189,30 @@ async function ensureGraphClient() {
 const apiCache = new Cache();
 
 /**
+ * Cache key builder for consistent cache key construction.
+ * Provides centralized cache key generation to avoid manual string construction.
+ */
+const CacheKeys = {
+  /**
+   * Generates cache key for notebooks list.
+   * @returns {string} Cache key for notebooks list.
+   */
+  notebooks: () => 'notebooks:list',
+
+  /**
+   * Generates cache key for sections list.
+   * @param {string} [notebookId] - Optional notebook ID to scope sections.
+   * @param {string} [sectionGroupId] - Optional section group ID to scope sections.
+   * @returns {string} Cache key for sections list.
+   */
+  sections: (notebookId, sectionGroupId) => {
+    if (notebookId) return `sections:list:notebook:${notebookId}`;
+    if (sectionGroupId) return `sections:list:group:${sectionGroupId}`;
+    return 'sections:list';
+  },
+};
+
+/**
  * Wraps an API call with caching logic.
  * @param {string} cacheKey - The key to use for caching.
  * @param {Function} apiCall - The async function that makes the API call.
@@ -583,7 +607,7 @@ server.tool(
   {},
   createToolHandler(async () => {
     const response = await cachedApiCall(
-      'notebooks:list',
+      CacheKeys.notebooks(),
       async () => await graphClient.api('/me/onenote/notebooks').get()
     );
 
@@ -611,18 +635,15 @@ server.tool(
   },
   createToolHandler(async ({ notebookId, sectionGroupId }) => {
     let endpoint = '/me/onenote/sections';
-    let cacheKey = 'sections:list';
 
     if (notebookId) {
       endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
-      cacheKey = `sections:list:notebook:${notebookId}`;
     } else if (sectionGroupId) {
       endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
-      cacheKey = `sections:list:group:${sectionGroupId}`;
     }
 
     const response = await cachedApiCall(
-      cacheKey,
+      CacheKeys.sections(notebookId, sectionGroupId),
       async () => await graphClient.api(endpoint).get()
     );
 
@@ -1368,7 +1389,7 @@ server.tool(
     const response = await graphClient.api('/me/onenote/notebooks').post({ displayName });
 
     // Invalidate notebook list cache
-    apiCache.invalidate('notebooks:list');
+    apiCache.invalidate(CacheKeys.notebooks());
 
     return {
       content: [
@@ -1411,8 +1432,8 @@ server.tool(
       .post({ displayName });
 
     // Invalidate sections cache for this notebook and general sections list
-    apiCache.invalidate(`sections:list:notebook:${validatedNotebookId}`);
-    apiCache.invalidate('sections:list');
+    apiCache.invalidate(CacheKeys.sections(validatedNotebookId));
+    apiCache.invalidate(CacheKeys.sections());
 
     return {
       content: [
