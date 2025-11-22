@@ -30,7 +30,13 @@ This server provides a rich set of tools for advanced OneNote management, includ
 *   **Advanced Content Processing:**
     *   Sophisticated HTML to readable text extraction.
     *   Markdown-to-HTML conversion for page content.
-*   **Robust Input Validation:** Uses Zod for defining and validating tool input schemas.
+*   **Robust Error Handling:**
+    *   Automatic retry with exponential backoff for transient failures (rate limits, server errors, timeouts).
+    *   Detailed, actionable error messages with specific guidance for each error type.
+    *   Intelligent handling of authentication, permissions, and network issues.
+*   **Security & Validation:**
+    *   Input validation and sanitization to prevent injection attacks.
+    *   Uses Zod for defining and validating tool input schemas.
 
 
 ## Prerequisites
