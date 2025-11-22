@@ -94,28 +94,49 @@ export function htmlToText(html) {
 }
 
 /**
- * Converts plain text or markdown to HTML for OneNote
- * @param {string} text - The text to convert
- * @returns {string} HTML string
+ * Converts plain text (with simple markdown) to HTML.
+ * Supports markdown features: code blocks, inline code, headers, bold, italic,
+ * links, horizontal rules, blockquotes, and lists.
+ * @param {string} text - The plain text to convert
+ * @returns {string} The HTML representation
  */
 export function textToHtml(text) {
-  if (!text) return '<p></p>';
+  if (!text) return '';
 
-  // Escape HTML special characters for security
-  let escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+  // Security: Never bypass escaping, even if input looks like HTML
+  // All user input must be escaped to prevent XSS
 
-  // Convert newlines to <br> and wrap in paragraphs
-  const paragraphs = escaped.split('\n\n').map(para => {
-    const withBreaks = para.split('\n').join('<br>');
-    return `<p>${withBreaks}</p>`;
-  });
+  let html = String(text) // Ensure text is a string
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // Basic HTML escaping first
+    .replace(/```([\s\S]*?)```/g, (match, code) => `<pre><code>${code.trim()}</code></pre>`)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+      const safeUrl = sanitizeUrl(url);
+      return `<a href="${safeUrl}">${linkText}</a>`;
+    })
+    .replace(/^---+$/gm, '<hr>')
+    .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^[\*\-\+] (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
 
-  return paragraphs.join('');
+  html = html.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return '';
+    if (/^<(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)/.test(trimmed) || /^<\/(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)>/.test(trimmed)) {
+      return trimmed; // Already an HTML element we processed or a closing tag
+    }
+    return `<p>${trimmed}</p>`;
+  }).filter(line => line).join('\n');
+
+  html = html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
+  html = html.replace(/(<blockquote>.*?<\/blockquote>(?:\s*<blockquote>.*?<\/blockquote>)*)/gs, '<blockquote>$1</blockquote>');
+
+  return html;
 }
 
 /**

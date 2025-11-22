@@ -203,7 +203,37 @@ Once connected and authenticated, you can ask your AI assistant to perform tasks
 *   "Append 'Follow up with John Doe' to the OneNote page with ID 'your-page-id-here'."
 *   "In my OneNote page 'Recipe Ideas', replace all instances of 'sugar' with 'sweetener'."
 
+## Testing
 
+This project includes a comprehensive test suite to ensure reliability and catch regressions.
+
+### Running Tests
+
+**Run all tests:**
+```bash
+npm test
+```
+
+**Run specific test types:**
+```bash
+npm run test:unit         # Unit tests (57 tests for utility functions)
+npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
+npm run test:integration  # Integration test (calls actual MCP tools)
+```
+
+### Test Structure
+
+- **test_unit.mjs** - Unit tests for utility functions (escapeODataString, sanitizeUrl, validateId, htmlToText, textToHtml, Cache class)
+- **test_smoke.mjs** - Smoke test that verifies the MCP server starts and all 22 tools are properly registered
+- **test_integration.mjs** - Integration tests that invoke tools and validate responses with the Microsoft Graph API
+
+### Test Coverage
+
+- ✅ **Security functions:** OData injection prevention, XSS protection, ID validation
+- ✅ **Content processing:** HTML-to-text conversion, markdown-to-HTML conversion
+- ✅ **Caching:** TTL expiration, pattern invalidation
+- ✅ **Server startup:** MCP protocol compliance, tool registration
+- ✅ **API integration:** Section queries, page searches with filters
 
 ## Troubleshooting
 

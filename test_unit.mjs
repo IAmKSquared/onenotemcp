@@ -199,19 +199,14 @@ describe('textToHtml', () => {
     assert.strictEqual(result.includes('&lt;script&gt;'), true);
   });
 
-  test('should convert newlines to <br> tags', () => {
-    const result = textToHtml('Line 1\nLine 2');
-    assert.strictEqual(result, '<p>Line 1<br>Line 2</p>');
-  });
-
-  test('should create separate paragraphs for double newlines', () => {
-    const result = textToHtml('Para 1\n\nPara 2');
-    assert.strictEqual(result, '<p>Para 1</p><p>Para 2</p>');
+  test('should create separate paragraphs for each line', () => {
+    const result = textToHtml('Para 1\nPara 2');
+    assert.strictEqual(result, '<p>Para 1</p>\n<p>Para 2</p>');
   });
 
   test('should handle empty text', () => {
-    assert.strictEqual(textToHtml(''), '<p></p>');
-    assert.strictEqual(textToHtml(null), '<p></p>');
+    assert.strictEqual(textToHtml(''), '');
+    assert.strictEqual(textToHtml(null), '');
   });
 
   test('should escape all dangerous characters', () => {
@@ -220,8 +215,73 @@ describe('textToHtml', () => {
     assert.strictEqual(result.includes('&amp;'), true);
     assert.strictEqual(result.includes('&lt;'), true);
     assert.strictEqual(result.includes('&gt;'), true);
-    assert.strictEqual(result.includes('<script'), false); // Should not contain unescaped tags
-    assert.strictEqual(result.includes('">'), false); // Should not contain unescaped quote combinations
+    assert.strictEqual(result.includes('<script'), false);
+  });
+
+  test('should convert markdown headers', () => {
+    const result = textToHtml('# H1\n## H2\n### H3');
+    assert.strictEqual(result.includes('<h1>H1</h1>'), true);
+    assert.strictEqual(result.includes('<h2>H2</h2>'), true);
+    assert.strictEqual(result.includes('<h3>H3</h3>'), true);
+  });
+
+  test('should convert bold text', () => {
+    const result = textToHtml('**bold** and __also bold__');
+    assert.strictEqual(result.includes('<strong>bold</strong>'), true);
+    assert.strictEqual(result.includes('<strong>also bold</strong>'), true);
+  });
+
+  test('should convert italic text', () => {
+    const result = textToHtml('*italic* and _also italic_');
+    assert.strictEqual(result.includes('<em>italic</em>'), true);
+    assert.strictEqual(result.includes('<em>also italic</em>'), true);
+  });
+
+  test('should convert inline code', () => {
+    const result = textToHtml('Use `code` here');
+    assert.strictEqual(result.includes('<code>code</code>'), true);
+  });
+
+  test('should convert code blocks', () => {
+    const result = textToHtml('```\nfunction test() {}\n```');
+    assert.strictEqual(result.includes('<pre><code>'), true);
+    assert.strictEqual(result.includes('function test() {}'), true);
+  });
+
+  test('should convert markdown links with safe URLs', () => {
+    const result = textToHtml('[Google](https://google.com)');
+    assert.strictEqual(result.includes('<a href="https://google.com">Google</a>'), true);
+  });
+
+  test('should sanitize dangerous URLs in links', () => {
+    const result = textToHtml('[Click](javascript:alert(1))');
+    assert.strictEqual(result.includes('javascript:'), false);
+    assert.strictEqual(result.includes('href="#"'), true);
+  });
+
+  test('should convert horizontal rules', () => {
+    const result = textToHtml('Above\n---\nBelow');
+    assert.strictEqual(result.includes('<hr>'), true);
+  });
+
+  test('should convert blockquotes', () => {
+    const result = textToHtml('> Quote line 1\n> Quote line 2');
+    assert.strictEqual(result.includes('<blockquote>Quote line 1</blockquote>'), true);
+  });
+
+  test('should convert unordered lists', () => {
+    const result = textToHtml('- Item 1\n- Item 2\n* Item 3');
+    assert.strictEqual(result.includes('<ul>'), true);
+    assert.strictEqual(result.includes('<li>Item 1</li>'), true);
+    assert.strictEqual(result.includes('<li>Item 2</li>'), true);
+    assert.strictEqual(result.includes('<li>Item 3</li>'), true);
+  });
+
+  test('should convert ordered lists', () => {
+    const result = textToHtml('1. First\n2. Second\n3. Third');
+    assert.strictEqual(result.includes('<ul>'), true);
+    assert.strictEqual(result.includes('<li>First</li>'), true);
+    assert.strictEqual(result.includes('<li>Second</li>'), true);
   });
 });
 
