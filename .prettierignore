@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+coverage/
+
+# Lockfiles
+package-lock.json
+
+# Git
+.git/
+
+# Sensitive files
+.access-token.txt
+.local-secret-key
+.env
+
+# Logs
+*.log
