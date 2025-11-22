@@ -9,7 +9,13 @@
     "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
     "test:unit": "node --test test_unit.mjs",
     "test:smoke": "node test_smoke.mjs",
-    "test:integration": "node test_integration.mjs"
+    "test:integration": "node test_integration.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,mjs,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,json,md}\"",
+    "quality": "npm run lint && npm run format:check && npm test",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -33,12 +39,29 @@
   "dependencies": {
     "@azure/identity": "^4.1.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
-    "@modelcontextprotocol/sdk": "^1.7.0", 
+    "@modelcontextprotocol/sdk": "^1.7.0",
     "jsdom": "^24.0.0",
     "node-fetch": "^3.3.2",
     "zod": "^3.23.8"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^61.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.6.2"
+  },
+  "lint-staged": {
+    "*.{js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

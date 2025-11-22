@@ -56,15 +56,15 @@ export function validateId(id, type = 'resource') {
 
   // Comprehensive security checks combining both implementations
   const dangerousPatterns = [
-    /<script/i,         // Script tags
-    /javascript:/i,     // JavaScript protocol
-    /data:/i,          // Data URI
-    /vbscript:/i,      // VBScript protocol
-    /\.\./,            // Path traversal
-    /[<>"'`]/,         // HTML/quote characters
-    /[\r\n]/,          // Newlines
-    /\s{2,}/,          // Multiple consecutive spaces
-    /[;|&$\\]/         // Command injection characters
+    /<script/i, // Script tags
+    /javascript:/i, // JavaScript protocol
+    /data:/i, // Data URI
+    /vbscript:/i, // VBScript protocol
+    /\.\./, // Path traversal
+    /[<>"'`]/, // HTML/quote characters
+    /[\r\n]/, // Newlines
+    /\s{2,}/, // Multiple consecutive spaces
+    /[;|&$\\]/, // Command injection characters
   ];
 
   for (const pattern of dangerousPatterns) {
@@ -79,7 +79,7 @@ export function validateId(id, type = 'resource') {
 /**
  * Extracts a short summary from HTML content
  * @param {string} html - The HTML content string
- * @param {number} [maxLength=300] - The maximum length of the summary
+ * @param {number} [maxLength] - The maximum length of the summary
  * @returns {string} A text summary
  */
 export function extractTextSummary(html, maxLength = 300) {
@@ -109,13 +109,13 @@ export function htmlToText(html) {
   const doc = dom.window.document;
 
   // Remove script and style elements
-  doc.querySelectorAll('script, style').forEach(el => el.remove());
+  doc.querySelectorAll('script, style').forEach((el) => el.remove());
 
   let text = doc.body.textContent || '';
 
   // Clean up whitespace
   text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Multiple blank lines to double
-  text = text.replace(/[ \t]+/g, ' ');           // Multiple spaces to single
+  text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single
   text = text.trim();
 
   return text;
@@ -135,34 +135,48 @@ export function textToHtml(text) {
   // All user input must be escaped to prevent XSS
 
   let html = String(text) // Ensure text is a string
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // Basic HTML escaping first
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;') // Basic HTML escaping first
     .replace(/```([\s\S]*?)```/g, (match, code) => `<pre><code>${code.trim()}</code></pre>`)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/_(.*?)_/g, '<em>$1</em>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
       const safeUrl = sanitizeUrl(url);
       return `<a href="${safeUrl}">${linkText}</a>`;
     })
     .replace(/^---+$/gm, '<hr>')
     .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^[\*\-\+] (.+)$/gm, '<li>$1</li>')
+    .replace(/^[*\-+] (.+)$/gm, '<li>$1</li>')
     .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
 
-  html = html.split('\n').map(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return '';
-    if (/^<(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)/.test(trimmed) || /^<\/(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)>/.test(trimmed)) {
-      return trimmed; // Already an HTML element we processed or a closing tag
-    }
-    return `<p>${trimmed}</p>`;
-  }).filter(line => line).join('\n');
+  html = html
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return '';
+      if (
+        /^<(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)/.test(trimmed) ||
+        /^<\/(h[1-6]|li|hr|blockquote|pre|code|strong|em|a)>/.test(trimmed)
+      ) {
+        return trimmed; // Already an HTML element we processed or a closing tag
+      }
+      return `<p>${trimmed}</p>`;
+    })
+    .filter((line) => line)
+    .join('\n');
 
   html = html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
-  html = html.replace(/(<blockquote>.*?<\/blockquote>(?:\s*<blockquote>.*?<\/blockquote>)*)/gs, '<blockquote>$1</blockquote>');
+  html = html.replace(
+    /(<blockquote>.*?<\/blockquote>(?:\s*<blockquote>.*?<\/blockquote>)*)/gs,
+    '<blockquote>$1</blockquote>'
+  );
 
   return html;
 }
@@ -171,11 +185,19 @@ export function textToHtml(text) {
  * Cache implementation with TTL support
  */
 export class Cache {
+  /**
+   * Creates a new Cache instance with default 5-minute TTL
+   */
   constructor() {
     this.cache = new Map();
     this.defaultTTL = 5 * 60 * 1000; // 5 minutes default
   }
 
+  /**
+   * Retrieves a value from the cache if it exists and hasn't expired
+   * @param {string} key - The cache key to retrieve
+   * @returns {*} The cached value, or undefined if not found or expired
+   */
   get(key) {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
@@ -188,11 +210,21 @@ export class Cache {
     return entry.value;
   }
 
+  /**
+   * Stores a value in the cache with an optional TTL
+   * @param {string} key - The cache key
+   * @param {*} value - The value to cache
+   * @param {number} [ttl] - Time to live in milliseconds (defaults to 5 minutes)
+   */
   set(key, value, ttl) {
     const expiry = Date.now() + (ttl || this.defaultTTL);
     this.cache.set(key, { value, expiry });
   }
 
+  /**
+   * Invalidates cache entries by key, wildcard pattern, or RegExp
+   * @param {string|RegExp} keyOrPattern - Exact key, wildcard pattern (e.g., "user:*"), or RegExp
+   */
   invalidate(keyOrPattern) {
     if (keyOrPattern instanceof RegExp) {
       // Support RegExp patterns
@@ -217,6 +249,9 @@ export class Cache {
     }
   }
 
+  /**
+   * Clears all entries from the cache
+   */
   clear() {
     this.cache.clear();
   }

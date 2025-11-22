@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { DeviceCodeCredential } from '@azure/identity';
 import { JSDOM } from 'jsdom';
@@ -8,9 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
-import { z } from "zod";
+import { z } from 'zod';
 import crypto from 'crypto';
-import { escapeODataString, sanitizeUrl, textToHtml, validateId, Cache, extractTextSummary } from './utils.mjs';
+import { escapeODataString, textToHtml, validateId, Cache, extractTextSummary } from './utils.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +32,7 @@ let graphClient = null;
 const server = new McpServer({
   name: 'onenote',
   version: '1.0.0',
-  description: 'OneNote MCP Server - Read, Write, and Edit OneNote content.'
+  description: 'OneNote MCP Server - Read, Write, and Edit OneNote content.',
 });
 
 // ============================================================================
@@ -102,7 +102,7 @@ function loadExistingToken() {
           tokenDataStr = fileContent;
           console.error('⚠️  Loaded unencrypted token (legacy format).');
         }
-      } catch (e) {
+      } catch (_e) {
         // Not JSON, likely plain text token (very old format)
         tokenDataStr = fileContent;
         console.error('⚠️  Loaded raw text token (legacy format).');
@@ -129,7 +129,7 @@ function loadExistingToken() {
         }
 
         accessToken = parsedToken.token;
-      } catch (parseError) {
+      } catch (_parseError) {
         accessToken = tokenDataStr; // Old format: plain token string
       }
     }
@@ -147,7 +147,7 @@ function initializeGraphClient() {
     graphClient = Client.init({
       authProvider: (done) => {
         done(null, accessToken);
-      }
+      },
     });
     console.error('Microsoft Graph client initialized.');
   }
@@ -165,7 +165,9 @@ async function ensureGraphClient() {
     loadExistingToken();
   }
   if (!accessToken) {
-    throw new Error('No access token available. Please authenticate first using the "authenticate" tool.');
+    throw new Error(
+      'No access token available. Please authenticate first using the "authenticate" tool.'
+    );
   }
   if (!graphClient) {
     initializeGraphClient();
@@ -221,18 +223,18 @@ function extractReadableText(html) {
     const dom = new JSDOM(html);
     const document = dom.window.document;
 
-    document.querySelectorAll('script, style').forEach(element => element.remove());
+    document.querySelectorAll('script, style').forEach((element) => element.remove());
 
     let text = '';
-    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
       const headingText = heading.textContent?.trim();
       if (headingText) text += `\n${headingText}\n${'-'.repeat(headingText.length)}\n`;
     });
-    document.querySelectorAll('p').forEach(paragraph => {
+    document.querySelectorAll('p').forEach((paragraph) => {
       const content = paragraph.textContent?.trim();
       if (content) text += `${content}\n\n`;
     });
-    document.querySelectorAll('ul, ol').forEach(list => {
+    document.querySelectorAll('ul, ol').forEach((list) => {
       text += '\n';
       list.querySelectorAll('li').forEach((item, index) => {
         const content = item.textContent?.trim();
@@ -240,11 +242,11 @@ function extractReadableText(html) {
       });
       text += '\n';
     });
-    document.querySelectorAll('table').forEach(table => {
+    document.querySelectorAll('table').forEach((table) => {
       text += '\n📊 Table content:\n';
-      table.querySelectorAll('tr').forEach(row => {
+      table.querySelectorAll('tr').forEach((row) => {
         const cells = Array.from(row.querySelectorAll('td, th'))
-          .map(cell => cell.textContent?.trim())
+          .map((cell) => cell.textContent?.trim())
           .join(' | ');
         if (cells.trim()) text += `${cells}\n`;
       });
@@ -268,17 +270,21 @@ function extractReadableText(html) {
 /**
  * Fetches the content of a OneNote page.
  * @param {string} pageId - The ID of the page.
- * @param {'httpDirect' | 'direct'} [method='httpDirect'] - The method to use for fetching.
+ * @param {'httpDirect' | 'direct'} [method] - The method to use for fetching.
  * @returns {Promise<string>} The HTML content of the page.
  */
 async function fetchPageContentAdvanced(pageId, method = 'httpDirect') {
   await ensureGraphClient();
   if (method === 'httpDirect') {
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    if (!response.ok) throw new Error(`HTTP error fetching page content! Status: ${response.status} ${response.statusText}`);
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!response.ok)
+      throw new Error(
+        `HTTP error fetching page content! Status: ${response.status} ${response.statusText}`
+      );
     return await response.text();
-  } else { // 'direct'
+  } else {
+    // 'direct'
     return await graphClient.api(`/me/onenote/pages/${pageId}/content`).get();
   }
 }
@@ -286,7 +292,7 @@ async function fetchPageContentAdvanced(pageId, method = 'httpDirect') {
 /**
  * Formats OneNote page information for display.
  * @param {object} page - The OneNote page object from Graph API.
- * @param {number | null} [index=null] - Optional index for numbered lists.
+ * @param {number | null} [index] - Optional index for numbered lists.
  * @returns {string} Formatted page information string.
  */
 function formatPageInfo(page, index = null) {
@@ -334,8 +340,10 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
 
       // Calculate delay with exponential backoff
       const delay = baseDelay * Math.pow(2, attempt);
-      console.error(`⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (Error: ${error.statusCode || error.code})`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      console.error(
+        `⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (Error: ${error.statusCode || error.code})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -353,7 +361,11 @@ function getDetailedErrorMessage(error, errorPrefix) {
   const errorMessage = error.message || 'Unknown error';
 
   // Authentication errors
-  if (statusCode === 401 || errorMessage.includes('authenticate') || errorMessage.includes('Access token')) {
+  if (
+    statusCode === 401 ||
+    errorMessage.includes('authenticate') ||
+    errorMessage.includes('Access token')
+  ) {
     return `🔐 **Authentication Required**\nYour access token has expired or is invalid. Please run the 'authenticate' tool to sign in again.`;
   }
 
@@ -417,7 +429,6 @@ function createToolHandler(handler, errorPrefix = 'Tool execution failed') {
       return await retryWithBackoff(async () => {
         return await handler(args);
       });
-
     } catch (error) {
       const detailedMessage = getDetailedErrorMessage(error, errorPrefix);
       return { isError: true, content: [{ type: 'text', text: detailedMessage }] };
@@ -431,26 +442,25 @@ function createToolHandler(handler, errorPrefix = 'Tool execution failed') {
 
 // --- Authentication Tools ---
 
-server.tool(
-  'authenticate',
-  {},
-  async () => {
-    try {
-      console.error('Starting device code authentication...');
-      let deviceCodeInfo = null;
-      const credential = new DeviceCodeCredential({
-        clientId: clientId,
-        userPromptCallback: (info) => {
-          deviceCodeInfo = info;
-          console.error(`\n=== AUTHENTICATION REQUIRED ===\n${info.message}\n================================\n`);
-        }
-      });
+server.tool('authenticate', {}, async () => {
+  try {
+    console.error('Starting device code authentication...');
+    let deviceCodeInfo = null;
+    const credential = new DeviceCodeCredential({
+      clientId: clientId,
+      userPromptCallback: (info) => {
+        deviceCodeInfo = info;
+        console.error(
+          `\n=== AUTHENTICATION REQUIRED ===\n${info.message}\n================================\n`
+        );
+      },
+    });
 
-      const authPromise = credential.getToken(scopes);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Allow time for userPromptCallback
+    const authPromise = credential.getToken(scopes);
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Allow time for userPromptCallback
 
-      if (deviceCodeInfo) {
-        const authMessage = `🔐 **AUTHENTICATION REQUIRED**
+    if (deviceCodeInfo) {
+      const authMessage = `🔐 **AUTHENTICATION REQUIRED**
 
 Please complete the following steps:
 1. **Open this URL in your browser:** https://microsoft.com/devicelogin
@@ -460,14 +470,17 @@ Please complete the following steps:
 
 Token will be saved automatically upon successful browser authentication.`;
 
-        authPromise.then(tokenResponse => {
+      authPromise
+        .then((tokenResponse) => {
           accessToken = tokenResponse.token;
           const tokenData = {
             token: accessToken,
             clientId: clientId,
             scopes: scopes,
             createdAt: new Date().toISOString(),
-            expiresOn: tokenResponse.expiresOnTimestamp ? new Date(tokenResponse.expiresOnTimestamp).toISOString() : null
+            expiresOn: tokenResponse.expiresOnTimestamp
+              ? new Date(tokenResponse.expiresOnTimestamp).toISOString()
+              : null,
           };
 
           // Encrypt before saving
@@ -475,48 +488,68 @@ Token will be saved automatically upon successful browser authentication.`;
           fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2));
           console.error('🔒 Token saved securely (encrypted).');
           initializeGraphClient();
-        }).catch(error => {
+        })
+        .catch((error) => {
           console.error(`Background authentication failed: ${error.message}`);
         });
 
-        return { content: [{ type: 'text', text: authMessage }] };
-      } else {
-        return { isError: true, content: [{ type: 'text', text: 'Could not retrieve device code information. Please try again or check console logs.' }] };
-      }
-    } catch (error) {
-      return { isError: true, content: [{ type: 'text', text: `Authentication failed: ${error.message}` }] };
+      return { content: [{ type: 'text', text: authMessage }] };
+    } else {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Could not retrieve device code information. Please try again or check console logs.',
+          },
+        ],
+      };
     }
+  } catch (error) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: `Authentication failed: ${error.message}` }],
+    };
   }
-);
+});
 
-server.tool(
-  'saveAccessToken',
-  {},
-  async () => {
-    try {
-      loadExistingToken();
-      if (accessToken) {
-        initializeGraphClient();
-        const testResponse = await graphClient.api('/me').get();
-        return {
-          content: [{
+server.tool('saveAccessToken', {}, async () => {
+  try {
+    loadExistingToken();
+    if (accessToken) {
+      initializeGraphClient();
+      const testResponse = await graphClient.api('/me').get();
+      return {
+        content: [
+          {
             type: 'text',
             text: `✅ **Authentication Successful!**
     Token loaded and verified.
 **Account Info:**
     - Name: ${testResponse.displayName || 'Unknown'}
     - Email: ${testResponse.userPrincipalName || 'Unknown'}
-🚀 You can now use OneNote tools!`
-          }]
-        };
-      } else {
-        return { isError: true, content: [{ type: 'text', text: `❌ **No Token Found.** Please run the 'authenticate' tool first.` }] };
-      }
-    } catch (error) {
-      return { isError: true, content: [{ type: 'text', text: `Failed to load or verify token: ${error.message}` }] };
+🚀 You can now use OneNote tools!`,
+          },
+        ],
+      };
+    } else {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `❌ **No Token Found.** Please run the 'authenticate' tool first.`,
+          },
+        ],
+      };
     }
+  } catch (error) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: `Failed to load or verify token: ${error.message}` }],
+    };
   }
-);
+});
 
 // --- Page Reading Tools ---
 
@@ -531,7 +564,14 @@ server.tool(
 
     if (response.value && response.value.length > 0) {
       const notebookList = response.value.map((nb, i) => formatPageInfo(nb, i)).join('\n\n');
-      return { content: [{ type: 'text', text: `📚 **Your OneNote Notebooks** (${response.value.length} found):\n\n${notebookList}` }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📚 **Your OneNote Notebooks** (${response.value.length} found):\n\n${notebookList}`,
+          },
+        ],
+      };
     } else {
       return { content: [{ type: 'text', text: '📚 No OneNote notebooks found.' }] };
     }
@@ -542,7 +582,7 @@ server.tool(
   'listSections',
   {
     notebookId: z.string().describe('The ID of the parent notebook.').optional(),
-    sectionGroupId: z.string().describe('The ID of the parent section group.').optional()
+    sectionGroupId: z.string().describe('The ID of the parent section group.').optional(),
   },
   createToolHandler(async ({ notebookId, sectionGroupId }) => {
     let endpoint = '/me/onenote/sections';
@@ -563,7 +603,11 @@ server.tool(
 
     if (response.value && response.value.length > 0) {
       const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-      return { content: [{ type: 'text', text: `📂 **Sections** (${response.value.length} found):\n\n${list}` }] };
+      return {
+        content: [
+          { type: 'text', text: `📂 **Sections** (${response.value.length} found):\n\n${list}` },
+        ],
+      };
     } else {
       return { content: [{ type: 'text', text: '📂 No sections found.' }] };
     }
@@ -574,7 +618,7 @@ server.tool(
   'listSectionGroups',
   {
     notebookId: z.string().describe('The ID of the parent notebook.').optional(),
-    sectionGroupId: z.string().describe('The ID of the parent section group.').optional()
+    sectionGroupId: z.string().describe('The ID of the parent section group.').optional(),
   },
   createToolHandler(async ({ notebookId, sectionGroupId }) => {
     let endpoint = '/me/onenote/sectionGroups';
@@ -587,7 +631,14 @@ server.tool(
     const response = await graphClient.api(endpoint).get();
     if (response.value && response.value.length > 0) {
       const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-      return { content: [{ type: 'text', text: `📁 **Section Groups** (${response.value.length} found):\n\n${list}` }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📁 **Section Groups** (${response.value.length} found):\n\n${list}`,
+          },
+        ],
+      };
     } else {
       return { content: [{ type: 'text', text: '📁 No section groups found.' }] };
     }
@@ -597,13 +648,14 @@ server.tool(
 server.tool(
   'searchSections',
   {
-    query: z.string().describe('The search term for section names.')
+    query: z.string().describe('The search term for section names.'),
   },
   createToolHandler(async ({ query }) => {
     // Escape the query to prevent OData injection and convert to lowercase for case-insensitive search
     const escapedQuery = escapeODataString(query).toLowerCase();
 
-    const response = await graphClient.api('/me/onenote/sections')
+    const response = await graphClient
+      .api('/me/onenote/sections')
       .filter(`contains(tolower(displayName), '${escapedQuery}')`)
       .select('id,displayName,parentNotebook,parentSectionGroup')
       .top(50)
@@ -616,8 +668,18 @@ server.tool(
       const displaySections = sections.slice(0, 10);
       const list = displaySections.map((item, i) => formatPageInfo(item, i)).join('\n\n');
       const more = sections.length > 10 ? `\n\n... and ${sections.length - 10} more.` : '';
-      const limitWarning = sections.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
-      return { content: [{ type: 'text', text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}${limitWarning}` }] };
+      const limitWarning =
+        sections.length === 50
+          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
+          : '';
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}${limitWarning}`,
+          },
+        ],
+      };
     } else {
       return { content: [{ type: 'text', text: `🔍 No sections found matching "${query}".` }] };
     }
@@ -627,7 +689,7 @@ server.tool(
 server.tool(
   'listPagesInSection',
   {
-    sectionId: z.string().describe('The ID of the section to list pages from.')
+    sectionId: z.string().describe('The ID of the section to list pages from.'),
   },
   createToolHandler(async ({ sectionId }) => {
     // Validate the section ID
@@ -640,12 +702,15 @@ server.tool(
       sectionName = sectionInfo.displayName;
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        throw new Error(
+          `Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`
+        );
       }
       throw error;
     }
 
-    const response = await graphClient.api(`/me/onenote/sections/${validatedSectionId}/pages`)
+    const response = await graphClient
+      .api(`/me/onenote/sections/${validatedSectionId}/pages`)
       .select('id,title,lastModifiedDateTime')
       .top(50)
       .get();
@@ -657,10 +722,22 @@ server.tool(
       const displayPages = pages.slice(0, 10);
       const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
       const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional pages not shown.` : '';
-      return { content: [{ type: 'text', text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+      const limitWarning =
+        pages.length === 50
+          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional pages not shown.`
+          : '';
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+          },
+        ],
+      };
     } else {
-      return { content: [{ type: 'text', text: `📄 No pages found in section "${sectionName}".` }] };
+      return {
+        content: [{ type: 'text', text: `📄 No pages found in section "${sectionName}".` }],
+      };
     }
   }, 'Failed to list pages in section')
 );
@@ -669,9 +746,22 @@ server.tool(
   'searchPages',
   {
     query: z.string().describe('The search term for page titles.').optional(),
-    modifiedAfter: z.string().describe('Filter pages modified after this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).').optional(),
-    modifiedBefore: z.string().describe('Filter pages modified before this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).').optional(),
-    notebookId: z.string().describe('Filter pages within a specific notebook (must provide notebook ID).').optional()
+    modifiedAfter: z
+      .string()
+      .describe(
+        'Filter pages modified after this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).'
+      )
+      .optional(),
+    modifiedBefore: z
+      .string()
+      .describe(
+        'Filter pages modified before this date (ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ).'
+      )
+      .optional(),
+    notebookId: z
+      .string()
+      .describe('Filter pages within a specific notebook (must provide notebook ID).')
+      .optional(),
   },
   createToolHandler(async ({ query, modifiedAfter, modifiedBefore, notebookId }) => {
     // Build filter conditions
@@ -694,16 +784,23 @@ server.tool(
     // If notebook filtering is requested, we need to get sections first, then pages
     if (notebookId) {
       const validatedNotebookId = validateId(notebookId, 'notebook');
-      const sectionsResponse = await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}/sections`).get();
+      const sectionsResponse = await graphClient
+        .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
+        .get();
       const sections = sectionsResponse.value || [];
 
       if (sections.length === 0) {
-        return { content: [{ type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` }] };
+        return {
+          content: [
+            { type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` },
+          ],
+        };
       }
 
       // Get pages from all sections in this notebook (in parallel for performance)
       const sectionPagePromises = sections.map(async (section) => {
-        let sectionRequest = graphClient.api(`/me/onenote/sections/${section.id}/pages`)
+        let sectionRequest = graphClient
+          .api(`/me/onenote/sections/${section.id}/pages`)
           .select('id,title,lastModifiedDateTime')
           .top(50);
 
@@ -725,15 +822,28 @@ server.tool(
         const displayPages = pages.slice(0, 10);
         const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
         const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-        const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
-        return { content: [{ type: 'text', text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+        const limitWarning =
+          pages.length === 50
+            ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
+            : '';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+            },
+          ],
+        };
       } else {
-        return { content: [{ type: 'text', text: `🔍 No pages found in notebook matching criteria.` }] };
+        return {
+          content: [{ type: 'text', text: `🔍 No pages found in notebook matching criteria.` }],
+        };
       }
     }
 
     // Standard search across all pages
-    let request = graphClient.api('/me/onenote/pages')
+    let request = graphClient
+      .api('/me/onenote/pages')
       .select('id,title,lastModifiedDateTime')
       .top(50);
 
@@ -749,14 +859,24 @@ server.tool(
       const displayPages = pages.slice(0, 10);
       const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
       const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.` : '';
+      const limitWarning =
+        pages.length === 50
+          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
+          : '';
 
       let searchDesc = '';
       if (query) searchDesc += `"${query}"`;
       if (modifiedAfter) searchDesc += ` modified after ${modifiedAfter}`;
       if (modifiedBefore) searchDesc += ` modified before ${modifiedBefore}`;
 
-      return { content: [{ type: 'text', text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+          },
+        ],
+      };
     } else {
       return { content: [{ type: 'text', text: `🔍 No pages found matching criteria.` }] };
     }
@@ -767,10 +887,11 @@ server.tool(
   'getPageContent',
   {
     pageId: z.string().describe('The ID of the page to retrieve content from.'),
-    format: z.enum(['text', 'html', 'summary'])
+    format: z
+      .enum(['text', 'html', 'summary'])
       .default('text')
       .describe('Format of the content: text (readable), html (raw), or summary (brief).')
-      .optional()
+      .optional(),
   },
   createToolHandler(async ({ pageId, format }) => {
     // Validate the page ID
@@ -785,7 +906,8 @@ server.tool(
     } else if (format === 'summary') {
       const summary = extractTextSummary(htmlContent, 300);
       resultText = `📄 **${pageInfo.title}** (Summary)\n\n${summary}`;
-    } else { // 'text'
+    } else {
+      // 'text'
       const textContent = extractReadableText(htmlContent);
       resultText = `📄 **${pageInfo.title}**\n📅 Modified: ${new Date(pageInfo.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
     }
@@ -797,15 +919,17 @@ server.tool(
   'getPageByTitle',
   {
     title: z.string().describe('The title (or partial title) of the page to find.'),
-    format: z.enum(['text', 'html', 'summary'])
+    format: z
+      .enum(['text', 'html', 'summary'])
       .default('text')
       .describe('Format of the content: text, html, or summary.')
-      .optional()
+      .optional(),
   },
   createToolHandler(async ({ title, format }) => {
     // Use server-side filtering with proper escaping and case-insensitive search
     const escapedTitle = escapeODataString(title).toLowerCase();
-    const pagesResponse = await graphClient.api('/me/onenote/pages')
+    const pagesResponse = await graphClient
+      .api('/me/onenote/pages')
       .filter(`contains(tolower(title), '${escapedTitle}')`)
       .select('id,title,lastModifiedDateTime')
       .top(50)
@@ -815,13 +939,22 @@ server.tool(
 
     if (matchingPages.length === 0) {
       // Fetch a few recent pages to show as alternatives
-      const recentPages = await graphClient.api('/me/onenote/pages')
+      const recentPages = await graphClient
+        .api('/me/onenote/pages')
         .select('title')
         .top(10)
         .orderby('lastModifiedDateTime desc')
         .get();
-      const availablePages = (recentPages.value || []).map(p => `- ${p.title}`).join('\n');
-      return { isError: true, content: [{ type: 'text', text: `❌ No page found with title containing "${title}".\n\nRecent pages (up to 10):\n${availablePages || 'None'}` }] };
+      const availablePages = (recentPages.value || []).map((p) => `- ${p.title}`).join('\n');
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `❌ No page found with title containing "${title}".\n\nRecent pages (up to 10):\n${availablePages || 'None'}`,
+          },
+        ],
+      };
     }
 
     // Use the first matching page
@@ -833,7 +966,8 @@ server.tool(
     } else if (format === 'summary') {
       const summary = extractTextSummary(htmlContent, 300);
       resultText = `📄 **${matchingPage.title}** (Summary)\n\n${summary}`;
-    } else { // 'text'
+    } else {
+      // 'text'
       const textContent = extractReadableText(htmlContent);
       resultText = `📄 **${matchingPage.title}**\n📅 Modified: ${new Date(matchingPage.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
     }
@@ -855,10 +989,11 @@ server.tool(
   {
     pageId: z.string().describe('The ID of the page to update.'),
     content: z.string().describe('New page content (HTML or markdown-style text).'),
-    preserveTitle: z.boolean()
+    preserveTitle: z
+      .boolean()
       .default(true)
       .describe('Keep the original title (default: true).')
-      .optional()
+      .optional(),
   },
   createToolHandler(async ({ pageId, content: newContent, preserveTitle }) => {
     // Validate the page ID
@@ -880,13 +1015,20 @@ server.tool(
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(validatedPageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: 'replace', content: finalHtml }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ target: 'body', action: 'replace', content: finalHtml }]),
     });
 
     if (!response.ok) throw new Error(`Update failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **Page Content Updated!**\nPage: ${pageInfo.title}\nUpdated: ${new Date().toLocaleString()}\nContent Length: ${newContent.length} chars.` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Page Content Updated!**\nPage: ${pageInfo.title}\nUpdated: ${new Date().toLocaleString()}\nContent Length: ${newContent.length} chars.`,
+        },
+      ],
+    };
   }, 'Failed to update page content')
 );
 
@@ -896,7 +1038,11 @@ server.tool(
     pageId: z.string().describe('The ID of the page to append content to.'),
     content: z.string().describe('Content to append (HTML or markdown-style).'),
     addTimestamp: z.boolean().default(true).describe('Add a timestamp (default: true).').optional(),
-    addSeparator: z.boolean().default(true).describe('Add a visual separator (default: true).').optional()
+    addSeparator: z
+      .boolean()
+      .default(true)
+      .describe('Add a visual separator (default: true).')
+      .optional(),
   },
   createToolHandler(async ({ pageId, content: newContent, addTimestamp, addSeparator }) => {
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
@@ -911,13 +1057,20 @@ server.tool(
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: 'append', content: appendHtml }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ target: 'body', action: 'append', content: appendHtml }]),
     });
 
     if (!response.ok) throw new Error(`Append failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **Content Appended!**\nPage: ${pageInfo.title}\nAppended: ${new Date().toLocaleString()}\nLength: ${newContent.length} chars.` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Content Appended!**\nPage: ${pageInfo.title}\nAppended: ${new Date().toLocaleString()}\nLength: ${newContent.length} chars.`,
+        },
+      ],
+    };
   }, 'Failed to append content')
 );
 
@@ -925,23 +1078,33 @@ server.tool(
   'updatePageTitle',
   {
     pageId: z.string().describe('The ID of the page whose title is to be updated.'),
-    newTitle: z.string().describe('The new title for the page.')
+    newTitle: z.string().describe('The new title for the page.'),
   },
   createToolHandler(async ({ pageId, newTitle }) => {
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
     const oldTitle = pageInfo.title;
-    console.error(`Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`);
+    console.error(
+      `Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`
+    );
 
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'title', action: 'replace', content: newTitle }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ target: 'title', action: 'replace', content: newTitle }]),
     });
 
-    if (!response.ok) throw new Error(`Title update failed: ${response.status} ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(`Title update failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **Page Title Updated!**\nOld Title: ${oldTitle}\nNew Title: ${newTitle}\nUpdated: ${new Date().toLocaleString()}` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Page Title Updated!**\nOld Title: ${oldTitle}\nNew Title: ${newTitle}\nUpdated: ${new Date().toLocaleString()}`,
+        },
+      ],
+    };
   }, 'Failed to update page title')
 );
 
@@ -951,7 +1114,11 @@ server.tool(
     pageId: z.string().describe('The ID of the page to modify.'),
     findText: z.string().describe('The text to find and replace.'),
     replaceText: z.string().describe('The text to replace with.'),
-    caseSensitive: z.boolean().default(false).describe('Case-sensitive search (default: false).').optional()
+    caseSensitive: z
+      .boolean()
+      .default(false)
+      .describe('Case-sensitive search (default: false).')
+      .optional(),
   },
   createToolHandler(async ({ pageId, findText, replaceText, caseSensitive }) => {
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
@@ -963,20 +1130,36 @@ server.tool(
     const matches = (htmlContent.match(regex) || []).length;
 
     if (matches === 0) {
-      return { content: [{ type: 'text', text: `ℹ️ **No matches found** for "${findText}" in page: ${pageInfo.title}.` }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `ℹ️ **No matches found** for "${findText}" in page: ${pageInfo.title}.`,
+          },
+        ],
+      };
     }
 
     const updatedContent = htmlContent.replace(regex, replaceText);
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        { target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` },
+      ]),
     });
 
     if (!response.ok) throw new Error(`Replace failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **Text Replaced!**\nPage: ${pageInfo.title}\nFound: "${findText}" (${matches} occurrences)\nReplaced with: "${replaceText}".` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Text Replaced!**\nPage: ${pageInfo.title}\nFound: "${findText}" (${matches} occurrences)\nReplaced with: "${replaceText}".`,
+        },
+      ],
+    };
   }, 'Failed to replace text')
 );
 
@@ -985,14 +1168,16 @@ server.tool(
   {
     pageId: z.string().describe('The ID of the page to add a note to.'),
     note: z.string().describe('The note/comment content.'),
-    noteType: z.enum(['note', 'todo', 'important', 'question'])
+    noteType: z
+      .enum(['note', 'todo', 'important', 'question'])
       .default('note')
       .describe('Type of note (note, todo, important, question).')
       .optional(),
-    position: z.enum(['top', 'bottom'])
+    position: z
+      .enum(['top', 'bottom'])
       .default('bottom')
       .describe('Position to add the note (top or bottom).')
-      .optional()
+      .optional(),
   },
   createToolHandler(async ({ pageId, note, noteType, position }) => {
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
@@ -1010,13 +1195,20 @@ server.tool(
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: action, content: noteHtml }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ target: 'body', action: action, content: noteHtml }]),
     });
 
     if (!response.ok) throw new Error(`Add note failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **${noteType.charAt(0).toUpperCase() + noteType.slice(1)} Added!**\nPage: ${pageInfo.title}\nPosition: ${position}.` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **${noteType.charAt(0).toUpperCase() + noteType.slice(1)} Added!**\nPage: ${pageInfo.title}\nPosition: ${position}.`,
+        },
+      ],
+    };
   }, 'Failed to add note')
 );
 
@@ -1026,34 +1218,47 @@ server.tool(
     pageId: z.string().describe('The ID of the page to add a table to.'),
     tableData: z.string().describe('Table data in CSV format (header row, then data rows).'),
     title: z.string().describe('Optional title for the table.').optional(),
-    position: z.enum(['top', 'bottom'])
+    position: z
+      .enum(['top', 'bottom'])
       .default('bottom')
       .describe('Position to add the table (top or bottom).')
-      .optional()
+      .optional(),
   },
   createToolHandler(async ({ pageId, tableData, title, position }) => {
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
     console.error(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
 
-    const rows = tableData.trim().split('\n').map(row => row.split(',').map(cell => cell.trim()));
-    if (rows.length < 2) throw new Error('Table data must have at least a header row and one data row.');
+    const rows = tableData
+      .trim()
+      .split('\n')
+      .map((row) => row.split(',').map((cell) => cell.trim()));
+    if (rows.length < 2)
+      throw new Error('Table data must have at least a header row and one data row.');
 
     const headerRow = rows[0];
     const dataRows = rows.slice(1);
     let tableHtml = title ? `<h3>📊 ${textToHtml(title)}</h3>` : '';
-    tableHtml += `<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead><tr style="background-color: #f5f5f5;">${headerRow.map(cell => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${textToHtml(cell)}</th>`).join('')}</tr></thead><tbody>${dataRows.map(row => `<tr>${row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${textToHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    tableHtml += `<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead><tr style="background-color: #f5f5f5;">${headerRow.map((cell) => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${textToHtml(cell)}</th>`).join('')}</tr></thead><tbody>${dataRows.map((row) => `<tr>${row.map((cell) => `<td style="border: 1px solid #ddd; padding: 8px;">${textToHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
     const action = position === 'top' ? 'prepend' : 'append';
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: action, content: tableHtml }])
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ target: 'body', action: action, content: tableHtml }]),
     });
 
-    if (!response.ok) throw new Error(`Add table failed: ${response.status} ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(`Add table failed: ${response.status} ${response.statusText}`);
 
-    return { content: [{ type: 'text', text: `✅ **Table Added!**\nPage: ${pageInfo.title}\nTitle: ${title || 'Untitled'}\nPosition: ${position}.` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Table Added!**\nPage: ${pageInfo.title}\nTitle: ${title || 'Untitled'}\nPosition: ${position}.`,
+        },
+      ],
+    };
   }, 'Failed to add table')
 );
 
@@ -1061,8 +1266,14 @@ server.tool(
 server.tool(
   'createPage',
   {
-    title: z.string().min(1, { message: "Title cannot be empty." }).describe('The title for the new page.'),
-    content: z.string().min(1, { message: "Content cannot be empty." }).describe('The content for the new page (HTML or markdown-style).')
+    title: z
+      .string()
+      .min(1, { message: 'Title cannot be empty.' })
+      .describe('The title for the new page.'),
+    content: z
+      .string()
+      .min(1, { message: 'Content cannot be empty.' })
+      .describe('The content for the new page (HTML or markdown-style).'),
   },
   createToolHandler(async ({ title, content }) => {
     console.error(`Attempting to create page with title: "${title}"`);
@@ -1095,14 +1306,16 @@ server.tool(
       .post(pageHtml);
 
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Page Created Successfully!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Page Created Successfully!**
 **Title:** ${response.title}
 **Page ID:** ${response.id}
 **In Section:** ${targetSectionName}
-**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
-      }]
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`,
+        },
+      ],
     };
   }, 'Error creating page')
 );
@@ -1110,15 +1323,26 @@ server.tool(
 server.tool(
   'createPageInSection',
   {
-    sectionId: z.string().min(1, { message: "Section ID cannot be empty." }).describe('The ID of the section to create the page in.'),
-    title: z.string().min(1, { message: "Title cannot be empty." }).describe('The title for the new page.'),
-    content: z.string().min(1, { message: "Content cannot be empty." }).describe('The content for the new page (HTML or markdown-style).')
+    sectionId: z
+      .string()
+      .min(1, { message: 'Section ID cannot be empty.' })
+      .describe('The ID of the section to create the page in.'),
+    title: z
+      .string()
+      .min(1, { message: 'Title cannot be empty.' })
+      .describe('The title for the new page.'),
+    content: z
+      .string()
+      .min(1, { message: 'Content cannot be empty.' })
+      .describe('The content for the new page (HTML or markdown-style).'),
   },
   createToolHandler(async ({ sectionId, title, content }) => {
     // Validate the section ID
     const validatedSectionId = validateId(sectionId, 'section');
 
-    console.error(`Attempting to create page with title: "${title}" in section: ${validatedSectionId}`);
+    console.error(
+      `Attempting to create page with title: "${title}" in section: ${validatedSectionId}`
+    );
 
     // Verify the section exists and get its name
     let targetSectionName;
@@ -1127,7 +1351,9 @@ server.tool(
       targetSectionName = sectionInfo.displayName;
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        throw new Error(
+          `Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`
+        );
       }
       throw error;
     }
@@ -1153,14 +1379,16 @@ server.tool(
       .post(pageHtml);
 
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Page Created Successfully!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Page Created Successfully!**
 **Title:** ${response.title}
 **Page ID:** ${response.id}
 **In Section:** ${targetSectionName}
-**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
-      }]
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`,
+        },
+      ],
     };
   }, 'Error creating page in section')
 );
@@ -1169,26 +1397,29 @@ server.tool(
 server.tool(
   'createNotebook',
   {
-    displayName: z.string().min(1, { message: "Notebook name cannot be empty." }).describe('The name for the new notebook.')
+    displayName: z
+      .string()
+      .min(1, { message: 'Notebook name cannot be empty.' })
+      .describe('The name for the new notebook.'),
   },
   createToolHandler(async ({ displayName }) => {
     console.error(`Creating notebook: "${displayName}"`);
 
-    const response = await graphClient
-      .api('/me/onenote/notebooks')
-      .post({ displayName });
+    const response = await graphClient.api('/me/onenote/notebooks').post({ displayName });
 
     // Invalidate notebook list cache
     apiCache.invalidate('notebooks:list');
 
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Notebook Created Successfully!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Notebook Created Successfully!**
 **Name:** ${response.displayName}
 **Notebook ID:** ${response.id}
-**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
-      }]
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`,
+        },
+      ],
     };
   }, 'Error creating notebook')
 );
@@ -1196,8 +1427,14 @@ server.tool(
 server.tool(
   'createSection',
   {
-    notebookId: z.string().min(1, { message: "Notebook ID cannot be empty." }).describe('The ID of the notebook to create the section in.'),
-    displayName: z.string().min(1, { message: "Section name cannot be empty." }).describe('The name for the new section.')
+    notebookId: z
+      .string()
+      .min(1, { message: 'Notebook ID cannot be empty.' })
+      .describe('The ID of the notebook to create the section in.'),
+    displayName: z
+      .string()
+      .min(1, { message: 'Section name cannot be empty.' })
+      .describe('The name for the new section.'),
   },
   createToolHandler(async ({ notebookId, displayName }) => {
     // Validate the notebook ID
@@ -1210,7 +1447,9 @@ server.tool(
       await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`);
+        throw new Error(
+          `Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`
+        );
       }
       throw error;
     }
@@ -1224,13 +1463,15 @@ server.tool(
     apiCache.invalidate('sections:list');
 
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Section Created Successfully!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Section Created Successfully!**
 **Name:** ${response.displayName}
 **Section ID:** ${response.id}
-**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
-      }]
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`,
+        },
+      ],
     };
   }, 'Error creating section')
 );
@@ -1238,8 +1479,14 @@ server.tool(
 server.tool(
   'createSectionGroup',
   {
-    notebookId: z.string().min(1, { message: "Notebook ID cannot be empty." }).describe('The ID of the notebook to create the section group in.'),
-    displayName: z.string().min(1, { message: "Section group name cannot be empty." }).describe('The name for the new section group.')
+    notebookId: z
+      .string()
+      .min(1, { message: 'Notebook ID cannot be empty.' })
+      .describe('The ID of the notebook to create the section group in.'),
+    displayName: z
+      .string()
+      .min(1, { message: 'Section group name cannot be empty.' })
+      .describe('The name for the new section group.'),
   },
   createToolHandler(async ({ notebookId, displayName }) => {
     // Validate the notebook ID
@@ -1252,7 +1499,9 @@ server.tool(
       await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`);
+        throw new Error(
+          `Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`
+        );
       }
       throw error;
     }
@@ -1265,13 +1514,15 @@ server.tool(
     // Cache invalidation would go here when listSectionGroups is cached
 
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Section Group Created Successfully!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Section Group Created Successfully!**
 **Name:** ${response.displayName}
 **Section Group ID:** ${response.id}
-**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
-      }]
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`,
+        },
+      ],
     };
   }, 'Error creating section group')
 );
@@ -1281,7 +1532,7 @@ server.tool(
   'copyPage',
   {
     pageId: z.string().describe('The ID of the page to copy.'),
-    targetSectionId: z.string().describe('The ID of the section to copy the page to.')
+    targetSectionId: z.string().describe('The ID of the section to copy the page to.'),
   },
   createToolHandler(async ({ pageId, targetSectionId }) => {
     // Validate IDs
@@ -1295,7 +1546,7 @@ server.tool(
     try {
       const [pageResult, sectionResult] = await Promise.all([
         graphClient.api(`/me/onenote/pages/${validatedPageId}`).get(),
-        graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get()
+        graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get(),
       ]);
       pageInfo = pageResult;
       targetSectionName = sectionResult.displayName;
@@ -1303,7 +1554,9 @@ server.tool(
       if (error.statusCode === 404) {
         // Determine which resource wasn't found
         if (error.message && error.message.includes('section')) {
-          throw new Error(`Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+          throw new Error(
+            `Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`
+          );
         } else {
           throw new Error(`Page with ID "${validatedPageId}" not found.`);
         }
@@ -1312,21 +1565,23 @@ server.tool(
     }
 
     // Initiate copy operation (async)
-    const copyResponse = await graphClient
+    const _copyResponse = await graphClient
       .api(`/me/onenote/pages/${validatedPageId}/copyToSection`)
       .post({ id: validatedSectionId });
 
     // The copy operation returns 202 Accepted with Operation-Location header
     // For simplicity, we return success immediately without polling
     return {
-      content: [{
-        type: 'text',
-        text: `✅ **Page Copy Initiated!**
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Page Copy Initiated!**
 **Original Page:** ${pageInfo.title}
 **Target Section:** ${targetSectionName}
 
-⚠️ Note: Copy is an asynchronous operation. The page will appear in the target section shortly.`
-      }]
+⚠️ Note: Copy is an asynchronous operation. The page will appear in the target section shortly.`,
+        },
+      ],
     };
   }, 'Error copying page')
 );
@@ -1349,12 +1604,18 @@ async function main() {
     await server.connect(transport);
 
     console.error('🚀✨ OneNote Ultimate MCP Server is now LIVE! ✨🚀');
-    console.error(`   Client ID: ${clientId.substring(0, 8)}... (Using ${process.env.AZURE_CLIENT_ID ? 'environment variable' : 'default'})`);
+    console.error(
+      `   Client ID: ${clientId.substring(0, 8)}... (Using ${process.env.AZURE_CLIENT_ID ? 'environment variable' : 'default'})`
+    );
     console.error('   Ready to manage your OneNote like never before!');
     console.error('--- Available Tool Categories ---');
     console.error('   🔐 Auth: authenticate, saveAccessToken');
-    console.error('   📚 Read: listNotebooks, searchPages, getPageContent, getPageByTitle, listSections, listSectionGroups, searchSections');
-    console.error('   ✏️ Edit: updatePageContent, appendToPage, updatePageTitle, replaceTextInPage, addNoteToPage, addTableToPage');
+    console.error(
+      '   📚 Read: listNotebooks, searchPages, getPageContent, getPageByTitle, listSections, listSectionGroups, searchSections'
+    );
+    console.error(
+      '   ✏️ Edit: updatePageContent, appendToPage, updatePageTitle, replaceTextInPage, addNoteToPage, addTableToPage'
+    );
     console.error('   ➕ Create: createPage');
     console.error('---------------------------------');
 
@@ -1366,7 +1627,6 @@ async function main() {
       console.error('\n🔌 OneNote MCP Server terminated...');
       process.exit(0);
     });
-
   } catch (error) {
     console.error(`💀 Critical error starting server: ${error.message}`, error.stack);
     process.exit(1);
