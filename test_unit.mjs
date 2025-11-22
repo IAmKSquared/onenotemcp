@@ -89,8 +89,8 @@ describe('sanitizeUrl', () => {
 
 describe('validateId', () => {
   test('should accept valid alphanumeric IDs', () => {
-    assert.doesNotThrow(() => validateId('abc123'));
-    assert.strictEqual(validateId('abc123'), 'abc123');
+    assert.doesNotThrow(() => validateId('abc1234567'));
+    assert.strictEqual(validateId('abc1234567'), 'abc1234567');
   });
 
   test('should accept IDs with hyphens and underscores', () => {
@@ -98,7 +98,7 @@ describe('validateId', () => {
   });
 
   test('should trim whitespace', () => {
-    assert.strictEqual(validateId('  abc123  '), 'abc123');
+    assert.strictEqual(validateId('  abc1234567  '), 'abc1234567');
   });
 
   test('should reject empty strings', () => {
@@ -110,29 +110,57 @@ describe('validateId', () => {
     assert.throws(() => validateId(undefined), /must be a non-empty string/);
   });
 
-  test('should reject IDs with HTML injection characters', () => {
-    assert.throws(() => validateId('<script>'), /dangerous characters/);
-    assert.throws(() => validateId('test>123'), /dangerous characters/);
-    assert.throws(() => validateId('test"123'), /dangerous characters/);
+  test('should reject IDs that are too short', () => {
+    assert.throws(() => validateId('abc123'), /out of expected range/);
+    assert.throws(() => validateId('short'), /out of expected range/);
+  });
+
+  test('should accept IDs with minimum length (10 chars)', () => {
+    assert.doesNotThrow(() => validateId('abcd123456'));
+  });
+
+  test('should reject IDs with HTML/script injection', () => {
+    assert.throws(() => validateId('<script>alert(1)</script>'), /dangerous characters/);
+    assert.throws(() => validateId('test<script'), /dangerous characters/);
+    assert.throws(() => validateId('test>123456'), /dangerous characters/);
+    assert.throws(() => validateId('test"1234567'), /dangerous characters/);
   });
 
   test('should reject javascript: protocol', () => {
     assert.throws(() => validateId('javascript:alert(1)'), /dangerous characters/);
   });
 
+  test('should reject data: protocol', () => {
+    assert.throws(() => validateId('data:text/html,<script>'), /dangerous characters/);
+  });
+
+  test('should reject vbscript: protocol', () => {
+    assert.throws(() => validateId('vbscript:msgbox'), /dangerous characters/);
+  });
+
   test('should reject path traversal attempts', () => {
     assert.throws(() => validateId('../../../etc/passwd'), /dangerous characters/);
   });
 
+  test('should reject newlines', () => {
+    assert.throws(() => validateId('test\ninjection'), /dangerous characters/);
+    assert.throws(() => validateId('test\rinjection'), /dangerous characters/);
+  });
+
+  test('should reject multiple consecutive spaces', () => {
+    assert.throws(() => validateId('test  injection'), /dangerous characters/);
+  });
+
   test('should reject command injection characters', () => {
-    assert.throws(() => validateId('test;ls'), /dangerous characters/);
-    assert.throws(() => validateId('test|cat'), /dangerous characters/);
-    assert.throws(() => validateId('test&whoami'), /dangerous characters/);
+    assert.throws(() => validateId('test;ls1234'), /dangerous characters/);
+    assert.throws(() => validateId('test|cat123'), /dangerous characters/);
+    assert.throws(() => validateId('test&whoami1'), /dangerous characters/);
+    assert.throws(() => validateId('test$var123'), /dangerous characters/);
   });
 
   test('should reject IDs that are too long', () => {
     const longId = 'a'.repeat(201);
-    assert.throws(() => validateId(longId), /too long/);
+    assert.throws(() => validateId(longId), /out of expected range/);
   });
 
   test('should accept IDs up to 200 characters', () => {

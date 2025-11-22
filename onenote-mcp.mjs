@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { z } from "zod";
 import crypto from 'crypto';
-import { escapeODataString, sanitizeUrl, textToHtml } from './utils.mjs';
+import { escapeODataString, sanitizeUrl, textToHtml, validateId } from './utils.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -350,49 +350,6 @@ function extractTextSummary(html, maxLength = 300) {
 // ============================================================================
 // ONENOTE API UTILITIES
 // ============================================================================
-
-/**
- * Validates that an ID matches expected Microsoft Graph ID patterns.
- * Accepts GUIDs and URL-safe base64 encoded IDs.
- * @param {string} id - The ID to validate.
- * @param {string} type - The type of ID (e.g., 'page', 'section', 'notebook') for error messages.
- * @throws {Error} If the ID format is invalid.
- */
-function validateId(id, type = 'resource') {
-  if (!id || typeof id !== 'string') {
-    throw new Error(`Invalid ${type} ID: ID must be a non-empty string.`);
-  }
-
-  // Trim the ID
-  const trimmedId = id.trim();
-
-  if (trimmedId.length === 0) {
-    throw new Error(`Invalid ${type} ID: ID cannot be empty or only whitespace.`);
-  }
-
-  // Check for reasonable length (Microsoft Graph IDs are typically 20-100 chars)
-  if (trimmedId.length < 10 || trimmedId.length > 200) {
-    throw new Error(`Invalid ${type} ID: ID length out of expected range (10-200 characters).`);
-  }
-
-  // Check for common invalid patterns that could indicate injection attempts
-  const dangerousPatterns = [
-    /<script/i,           // Script tags
-    /javascript:/i,       // JavaScript protocol
-    /\.\./,               // Path traversal
-    /[<>"'`]/,           // HTML/quote characters that shouldn't be in IDs
-    /[\r\n]/,            // Newlines
-    /\s{2,}/             // Multiple consecutive spaces
-  ];
-
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(trimmedId)) {
-      throw new Error(`Invalid ${type} ID: ID contains invalid characters or patterns.`);
-    }
-  }
-
-  return trimmedId;
-}
 
 /**
  * Fetches the content of a OneNote page.

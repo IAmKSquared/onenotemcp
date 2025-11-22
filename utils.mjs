@@ -31,10 +31,12 @@ export function sanitizeUrl(url) {
 }
 
 /**
- * Validates resource IDs to prevent injection attacks
+ * Validates resource IDs to prevent injection attacks.
+ * Microsoft Graph IDs are typically 20-100 characters, but we allow 10-200 for flexibility.
  * @param {string} id - The ID to validate
  * @param {string} type - The resource type (for error messages)
  * @throws {Error} If ID is invalid
+ * @returns {string} The trimmed, validated ID
  */
 export function validateId(id, type = 'resource') {
   if (!id || typeof id !== 'string') {
@@ -47,17 +49,22 @@ export function validateId(id, type = 'resource') {
     throw new Error(`Invalid ${type} ID: ID cannot be empty or whitespace.`);
   }
 
-  if (trimmedId.length > 200) {
-    throw new Error(`Invalid ${type} ID: ID is too long (max 200 characters).`);
+  // Microsoft Graph IDs are typically 20-100 chars, allow 10-200 for flexibility
+  if (trimmedId.length < 10 || trimmedId.length > 200) {
+    throw new Error(`Invalid ${type} ID: ID length out of expected range (10-200 characters).`);
   }
 
+  // Comprehensive security checks combining both implementations
   const dangerousPatterns = [
-    /[<>'"]/,           // HTML/JS injection characters
+    /<script/i,         // Script tags
     /javascript:/i,     // JavaScript protocol
     /data:/i,          // Data URI
     /vbscript:/i,      // VBScript protocol
     /\.\./,            // Path traversal
-    /[;|&$`\\]/        // Command injection characters
+    /[<>"'`]/,         // HTML/quote characters
+    /[\r\n]/,          // Newlines
+    /\s{2,}/,          // Multiple consecutive spaces
+    /[;|&$\\]/         // Command injection characters
   ];
 
   for (const pattern of dangerousPatterns) {
