@@ -251,6 +251,26 @@ function formatPageInfo(page, index = null) {
   return `${prefix}**${name}** (ID: ${page.id})`;
 }
 
+/**
+ * Formats a list of items with pagination display (first 10 items + "X more" message).
+ * @param {Array} items - The array of items to format.
+ * @param {string} [itemType] - The type of items (e.g., 'pages', 'sections'). Defaults to 'items'.
+ * @param {number} [maxDisplay] - Maximum number of items to display. Defaults to 10.
+ * @param {number} [apiLimit] - The API result limit to check for warning. Defaults to 50.
+ * @returns {object} Object with {list, more, limitWarning} strings.
+ */
+function formatItemList(items, itemType = 'items', maxDisplay = 10, apiLimit = 50) {
+  const displayItems = items.slice(0, maxDisplay);
+  const list = displayItems.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+  const more =
+    items.length > maxDisplay ? `\n\n... and ${items.length - maxDisplay} more ${itemType}.` : '';
+  const limitWarning =
+    items.length === apiLimit
+      ? `\n\n⚠️ Note: Reached the ${apiLimit}-result limit. There may be additional matches not shown.`
+      : '';
+  return { list, more, limitWarning };
+}
+
 // ============================================================================
 // TOOL HANDLER WRAPPER
 // ============================================================================
@@ -614,14 +634,7 @@ server.tool(
     const sections = response.value || [];
 
     if (sections.length > 0) {
-      // Display first 10 results, but keep all 50 fetched for accurate count
-      const displaySections = sections.slice(0, 10);
-      const list = displaySections.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-      const more = sections.length > 10 ? `\n\n... and ${sections.length - 10} more.` : '';
-      const limitWarning =
-        sections.length === 50
-          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
-          : '';
+      const { list, more, limitWarning } = formatItemList(sections, 'results');
       return {
         content: [
           {
@@ -668,19 +681,12 @@ server.tool(
     const pages = response.value || [];
 
     if (pages.length > 0) {
-      // Display first 10 results, but keep all 50 fetched for accurate count
-      const displayPages = pages.slice(0, 10);
-      const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
-      const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      const limitWarning =
-        pages.length === 50
-          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional pages not shown.`
-          : '';
+      const { list, more, limitWarning } = formatItemList(pages, 'pages');
       return {
         content: [
           {
             type: 'text',
-            text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+            text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${list}${more}${limitWarning}`,
           },
         ],
       };
@@ -769,18 +775,12 @@ server.tool(
       const pages = allPages.slice(0, 50); // Limit to 50 total
 
       if (pages.length > 0) {
-        const displayPages = pages.slice(0, 10);
-        const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
-        const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-        const limitWarning =
-          pages.length === 50
-            ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
-            : '';
+        const { list, more, limitWarning } = formatItemList(pages, 'pages');
         return {
           content: [
             {
               type: 'text',
-              text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+              text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${list}${more}${limitWarning}`,
             },
           ],
         };
@@ -805,14 +805,7 @@ server.tool(
     const pages = apiResponse.value || [];
 
     if (pages.length > 0) {
-      // Display first 10 results, but keep all 50 fetched for accurate count
-      const displayPages = pages.slice(0, 10);
-      const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
-      const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      const limitWarning =
-        pages.length === 50
-          ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional matches not shown.`
-          : '';
+      const { list, more, limitWarning } = formatItemList(pages, 'pages');
 
       let searchDesc = '';
       if (query) searchDesc += `"${query}"`;
@@ -823,7 +816,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${pageList}${more}${limitWarning}`,
+            text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${list}${more}${limitWarning}`,
           },
         ],
       };
