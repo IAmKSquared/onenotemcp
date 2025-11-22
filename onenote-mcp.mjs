@@ -16,6 +16,7 @@ import {
   Cache,
   extractTextSummary,
   extractReadableText,
+  validateCsvData,
 } from './utils.mjs';
 import { KeyStorage } from './key-storage.mjs';
 
@@ -1256,12 +1257,8 @@ server.tool(
     const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
     console.error(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
 
-    const rows = tableData
-      .trim()
-      .split('\n')
-      .map((row) => row.split(',').map((cell) => cell.trim()));
-    if (rows.length < 2)
-      throw new Error('Table data must have at least a header row and one data row.');
+    // Validate and sanitize CSV data
+    const rows = validateCsvData(tableData);
 
     const headerRow = rows[0];
     const dataRows = rows.slice(1);

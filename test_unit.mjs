@@ -13,6 +13,7 @@ import {
   extractReadableText,
   textToHtml,
   Cache,
+  validateCsvData,
 } from './utils.mjs';
 
 // ============================================================================
@@ -515,6 +516,146 @@ describe('Cache', () => {
 
     const retrieved = cache.get('key1');
     assert.deepStrictEqual(retrieved, obj);
+  });
+});
+
+// ============================================================================
+// CSV Validation Tests
+// ============================================================================
+
+describe('validateCsvData', () => {
+  test('should parse valid CSV data', () => {
+    const csv = 'Name,Age,City\nJohn,30,NYC\nJane,25,LA';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 3);
+    assert.deepStrictEqual(result[0], ['Name', 'Age', 'City']);
+    assert.deepStrictEqual(result[1], ['John', '30', 'NYC']);
+    assert.deepStrictEqual(result[2], ['Jane', '25', 'LA']);
+  });
+
+  test('should reject CSV with only header row', () => {
+    const csv = 'Name,Age,City';
+    assert.throws(() => validateCsvData(csv), {
+      message: 'Table data must have at least a header row and one data row.',
+    });
+  });
+
+  test('should reject empty CSV', () => {
+    assert.throws(() => validateCsvData(''), {
+      message: 'CSV data must be a non-empty string.',
+    });
+  });
+
+  test('should reject null/undefined', () => {
+    assert.throws(() => validateCsvData(null), {
+      message: 'CSV data must be a non-empty string.',
+    });
+    assert.throws(() => validateCsvData(undefined), {
+      message: 'CSV data must be a non-empty string.',
+    });
+  });
+
+  test('should reject inconsistent column counts', () => {
+    const csv = 'Name,Age,City\nJohn,30\nJane,25,LA';
+    assert.throws(() => validateCsvData(csv), {
+      message:
+        'Row 2 has 2 columns, but header has 3 columns. All rows must have the same number of columns.',
+    });
+  });
+
+  test('should reject CSV with empty lines filtered leaving only header', () => {
+    const csv = '\nName,Age,City\n\n';
+    assert.throws(() => validateCsvData(csv), {
+      message: 'Table data must have at least a header row and one data row.',
+    });
+  });
+
+  test('should handle CSV with extra whitespace', () => {
+    const csv = '  Name , Age , City  \n  John , 30 , NYC  \n  Jane , 25 , LA  ';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 3);
+    assert.deepStrictEqual(result[0], ['Name', 'Age', 'City']);
+    assert.deepStrictEqual(result[1], ['John', '30', 'NYC']);
+  });
+
+  test('should sanitize cells with formula prefixes (=)', () => {
+    const csv = 'Name,Formula\nJohn,=SUM(A1:A10)';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[1][1], "'=SUM(A1:A10)");
+  });
+
+  test('should sanitize cells with + prefix', () => {
+    const csv = 'Name,Value\nJohn,+123';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][1], "'+123");
+  });
+
+  test('should sanitize cells with - prefix', () => {
+    const csv = 'Name,Value\nJohn,-123';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][1], "'-123");
+  });
+
+  test('should sanitize cells with @ prefix', () => {
+    const csv = 'Name,Handle\nJohn,@user';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][1], "'@user");
+  });
+
+  test('should not sanitize normal cells', () => {
+    const csv = 'Name,Description\nJohn,This is a normal cell';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][1], 'This is a normal cell');
+  });
+
+  test('should filter out completely empty rows', () => {
+    const csv = 'Name,Age\n\n\nJohn,30\n\nJane,25\n\n';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 3); // Header + 2 data rows
+    assert.deepStrictEqual(result[0], ['Name', 'Age']);
+    assert.deepStrictEqual(result[1], ['John', '30']);
+    assert.deepStrictEqual(result[2], ['Jane', '25']);
+  });
+
+  test('should handle CSV with single column', () => {
+    const csv = 'Name\nJohn\nJane';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 3);
+    assert.deepStrictEqual(result[0], ['Name']);
+    assert.deepStrictEqual(result[1], ['John']);
+    assert.deepStrictEqual(result[2], ['Jane']);
+  });
+
+  test('should handle CSV with many columns', () => {
+    const csv = 'A,B,C,D,E,F\n1,2,3,4,5,6\n7,8,9,10,11,12';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result.length, 3);
+    assert.strictEqual(result[0].length, 6);
+    assert.strictEqual(result[1].length, 6);
+    assert.strictEqual(result[2].length, 6);
+  });
+
+  test('should sanitize multiple dangerous cells', () => {
+    const csv = 'Col1,Col2,Col3\n=FORMULA(),+123,-456\n@handle,normal,=ANOTHER()';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][0], "'=FORMULA()");
+    assert.strictEqual(result[1][1], "'+123");
+    assert.strictEqual(result[1][2], "'-456");
+    assert.strictEqual(result[2][0], "'@handle");
+    assert.strictEqual(result[2][1], 'normal');
+    assert.strictEqual(result[2][2], "'=ANOTHER()");
   });
 });
 

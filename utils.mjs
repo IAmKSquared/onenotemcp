@@ -285,3 +285,72 @@ export class Cache {
     this.cache.clear();
   }
 }
+
+/**
+ * Validates and sanitizes CSV data to prevent injection attacks and ensure data integrity.
+ * @param {string} csvString - The CSV data as a string (comma-separated values, newline-separated rows).
+ * @returns {Array<Array<string>>} Array of rows, each row is an array of sanitized cell values.
+ * @throws {Error} If validation fails (too few rows, inconsistent columns, etc.)
+ */
+export function validateCsvData(csvString) {
+  if (!csvString || typeof csvString !== 'string') {
+    throw new Error('CSV data must be a non-empty string.');
+  }
+
+  // Split into rows and filter out empty lines
+  const rows = csvString
+    .trim()
+    .split('\n')
+    .map((row) => row.trim())
+    .filter((row) => row.length > 0);
+
+  // Validate minimum rows (header + at least one data row)
+  if (rows.length < 2) {
+    throw new Error('Table data must have at least a header row and one data row.');
+  }
+
+  // Parse each row into cells (simple comma-split for now)
+  const parsedRows = rows.map((row) => row.split(',').map((cell) => cell.trim()));
+
+  // Validate consistent column count
+  const columnCount = parsedRows[0].length;
+  if (columnCount === 0) {
+    throw new Error('Header row cannot be empty.');
+  }
+
+  for (let i = 0; i < parsedRows.length; i++) {
+    if (parsedRows[i].length !== columnCount) {
+      throw new Error(
+        `Row ${i + 1} has ${parsedRows[i].length} columns, but header has ${columnCount} columns. All rows must have the same number of columns.`
+      );
+    }
+  }
+
+  // Sanitize cells to prevent CSV injection attacks
+  // CSV injection occurs when cells start with =, +, -, @, which Excel/Sheets interpret as formulas
+  const sanitizedRows = parsedRows.map((row) => row.map((cell) => sanitizeCsvCell(cell)));
+
+  return sanitizedRows;
+}
+
+/**
+ * Sanitizes a single CSV cell to prevent injection attacks.
+ * @param {string} cell - The cell value to sanitize.
+ * @returns {string} The sanitized cell value.
+ */
+function sanitizeCsvCell(cell) {
+  if (!cell || typeof cell !== 'string') {
+    return '';
+  }
+
+  const trimmed = cell.trim();
+
+  // Check for dangerous formula prefixes
+  const dangerousPrefixes = ['=', '+', '-', '@', '\t', '\r'];
+  if (dangerousPrefixes.some((prefix) => trimmed.startsWith(prefix))) {
+    // Prepend single quote to neutralize formula interpretation
+    return `'${trimmed}`;
+  }
+
+  return trimmed;
+}
