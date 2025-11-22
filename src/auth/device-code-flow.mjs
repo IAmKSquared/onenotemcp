@@ -1,5 +1,4 @@
 import { DeviceCodeCredential } from '@azure/identity';
-import { setAccessToken } from './token-manager.mjs';
 import { saveToken } from './token-manager.mjs';
 
 // --- Configuration ---
@@ -8,9 +7,10 @@ const scopes = ['Notes.Read', 'Notes.ReadWrite', 'Notes.Create', 'User.Read'];
 
 /**
  * Initiates device code authentication flow.
+ * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  * @returns {Promise<{success: boolean, deviceCodeInfo: object | null, authPromise: Promise | null, error: string | null}>}
  */
-export async function authenticateWithDeviceCode() {
+export async function authenticateWithDeviceCode(session) {
   try {
     console.error('Starting device code authentication...');
     let deviceCodeInfo = null;
@@ -40,7 +40,7 @@ export async function authenticateWithDeviceCode() {
     // Set up background token handling
     authPromise
       .then(async (tokenResponse) => {
-        setAccessToken(tokenResponse.token);
+        session.setAccessToken(tokenResponse.token);
         const tokenData = {
           token: tokenResponse.token,
           clientId: clientId,

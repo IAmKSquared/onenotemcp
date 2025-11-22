@@ -1,15 +1,14 @@
 import { authenticateWithDeviceCode } from '../auth/device-code-flow.mjs';
-import { loadExistingToken } from '../auth/token-manager.mjs';
-import { initializeGraphClient, getGraphClient } from '../api/graph-client.mjs';
 
 /**
  * Registers authentication-related tools with the MCP server.
  * @param {McpServer} server - The MCP server instance.
+ * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  */
-export function registerAuthTools(server) {
+export function registerAuthTools(server, session) {
   server.tool('authenticate', {}, async () => {
     try {
-      const result = await authenticateWithDeviceCode();
+      const result = await authenticateWithDeviceCode(session);
 
       if (!result.success) {
         return {
@@ -46,8 +45,8 @@ Token will be saved automatically upon successful browser authentication.`;
 
   server.tool('saveAccessToken', {}, async () => {
     try {
-      await loadExistingToken();
-      const graphClient = initializeGraphClient();
+      await session.loadExistingToken();
+      const graphClient = session.initializeGraphClient();
 
       if (graphClient) {
         const testResponse = await graphClient.api('/me').get();

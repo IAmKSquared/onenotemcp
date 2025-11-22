@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { getGraphClient } from '../api/graph-client.mjs';
 import { cachedApiCall, CacheKeys } from '../api/cache.mjs';
 import { createToolHandler } from '../api/retry.mjs';
 import { formatPageInfo, formatItemList } from '../utils/html.mjs';
@@ -14,32 +13,37 @@ import {
 /**
  * Registers read-related tools with the MCP server.
  * @param {McpServer} server - The MCP server instance.
+ * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  */
-export function registerReadTools(server) {
+export function registerReadTools(server, session) {
   server.tool(
     'listNotebooks',
     {},
-    createToolHandler(async () => {
-      const graphClient = getGraphClient();
-      const response = await cachedApiCall(
-        CacheKeys.notebooks(),
-        async () => await graphClient.api('/me/onenote/notebooks').get()
-      );
+    createToolHandler(
+      session,
+      async () => {
+        const graphClient = session.getGraphClient();
+        const response = await cachedApiCall(
+          CacheKeys.notebooks(),
+          async () => await graphClient.api('/me/onenote/notebooks').get()
+        );
 
-      if (response.value && response.value.length > 0) {
-        const notebookList = response.value.map((nb, i) => formatPageInfo(nb, i)).join('\n\n');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `📚 **Your OneNote Notebooks** (${response.value.length} found):\n\n${notebookList}`,
-            },
-          ],
-        };
-      } else {
-        return { content: [{ type: 'text', text: '📚 No OneNote notebooks found.' }] };
-      }
-    }, 'Failed to list notebooks')
+        if (response.value && response.value.length > 0) {
+          const notebookList = response.value.map((nb, i) => formatPageInfo(nb, i)).join('\n\n');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `📚 **Your OneNote Notebooks** (${response.value.length} found):\n\n${notebookList}`,
+              },
+            ],
+          };
+        } else {
+          return { content: [{ type: 'text', text: '📚 No OneNote notebooks found.' }] };
+        }
+      },
+      'Failed to list notebooks'
+    )
   );
 
   server.tool(
@@ -48,32 +52,39 @@ export function registerReadTools(server) {
       notebookId: z.string().describe('The ID of the parent notebook.').optional(),
       sectionGroupId: z.string().describe('The ID of the parent section group.').optional(),
     },
-    createToolHandler(async ({ notebookId, sectionGroupId }) => {
-      const graphClient = getGraphClient();
-      let endpoint = '/me/onenote/sections';
+    createToolHandler(
+      session,
+      async ({ notebookId, sectionGroupId }) => {
+        const graphClient = session.getGraphClient();
+        let endpoint = '/me/onenote/sections';
 
-      if (notebookId) {
-        endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
-      } else if (sectionGroupId) {
-        endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
-      }
+        if (notebookId) {
+          endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
+        } else if (sectionGroupId) {
+          endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
+        }
 
-      const response = await cachedApiCall(
-        CacheKeys.sections(notebookId, sectionGroupId),
-        async () => await graphClient.api(endpoint).get()
-      );
+        const response = await cachedApiCall(
+          CacheKeys.sections(notebookId, sectionGroupId),
+          async () => await graphClient.api(endpoint).get()
+        );
 
-      if (response.value && response.value.length > 0) {
-        const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-        return {
-          content: [
-            { type: 'text', text: `📂 **Sections** (${response.value.length} found):\n\n${list}` },
-          ],
-        };
-      } else {
-        return { content: [{ type: 'text', text: '📂 No sections found.' }] };
-      }
-    }, 'Failed to list sections')
+        if (response.value && response.value.length > 0) {
+          const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `📂 **Sections** (${response.value.length} found):\n\n${list}`,
+              },
+            ],
+          };
+        } else {
+          return { content: [{ type: 'text', text: '📂 No sections found.' }] };
+        }
+      },
+      'Failed to list sections'
+    )
   );
 
   server.tool(
@@ -82,30 +93,34 @@ export function registerReadTools(server) {
       notebookId: z.string().describe('The ID of the parent notebook.').optional(),
       sectionGroupId: z.string().describe('The ID of the parent section group.').optional(),
     },
-    createToolHandler(async ({ notebookId, sectionGroupId }) => {
-      const graphClient = getGraphClient();
-      let endpoint = '/me/onenote/sectionGroups';
-      if (notebookId) {
-        endpoint = `/me/onenote/notebooks/${notebookId}/sectionGroups`;
-      } else if (sectionGroupId) {
-        endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sectionGroups`;
-      }
+    createToolHandler(
+      session,
+      async ({ notebookId, sectionGroupId }) => {
+        const graphClient = session.getGraphClient();
+        let endpoint = '/me/onenote/sectionGroups';
+        if (notebookId) {
+          endpoint = `/me/onenote/notebooks/${notebookId}/sectionGroups`;
+        } else if (sectionGroupId) {
+          endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sectionGroups`;
+        }
 
-      const response = await graphClient.api(endpoint).get();
-      if (response.value && response.value.length > 0) {
-        const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `📁 **Section Groups** (${response.value.length} found):\n\n${list}`,
-            },
-          ],
-        };
-      } else {
-        return { content: [{ type: 'text', text: '📁 No section groups found.' }] };
-      }
-    }, 'Failed to list section groups')
+        const response = await graphClient.api(endpoint).get();
+        if (response.value && response.value.length > 0) {
+          const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `📁 **Section Groups** (${response.value.length} found):\n\n${list}`,
+              },
+            ],
+          };
+        } else {
+          return { content: [{ type: 'text', text: '📁 No section groups found.' }] };
+        }
+      },
+      'Failed to list section groups'
+    )
   );
 
   server.tool(
@@ -113,33 +128,37 @@ export function registerReadTools(server) {
     {
       query: z.string().describe('The search term for section names.'),
     },
-    createToolHandler(async ({ query }) => {
-      const graphClient = getGraphClient();
-      const escapedQuery = escapeODataString(query).toLowerCase();
+    createToolHandler(
+      session,
+      async ({ query }) => {
+        const graphClient = session.getGraphClient();
+        const escapedQuery = escapeODataString(query).toLowerCase();
 
-      const response = await graphClient
-        .api('/me/onenote/sections')
-        .filter(`contains(tolower(displayName), '${escapedQuery}')`)
-        .select('id,displayName,parentNotebook,parentSectionGroup')
-        .top(50)
-        .get();
+        const response = await graphClient
+          .api('/me/onenote/sections')
+          .filter(`contains(tolower(displayName), '${escapedQuery}')`)
+          .select('id,displayName,parentNotebook,parentSectionGroup')
+          .top(50)
+          .get();
 
-      const sections = response.value || [];
+        const sections = response.value || [];
 
-      if (sections.length > 0) {
-        const { list, more, limitWarning } = formatItemList(sections, 'results');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}${limitWarning}`,
-            },
-          ],
-        };
-      } else {
-        return { content: [{ type: 'text', text: `🔍 No sections found matching "${query}".` }] };
-      }
-    }, 'Failed to search sections')
+        if (sections.length > 0) {
+          const { list, more, limitWarning } = formatItemList(sections, 'results');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}${limitWarning}`,
+              },
+            ],
+          };
+        } else {
+          return { content: [{ type: 'text', text: `🔍 No sections found matching "${query}".` }] };
+        }
+      },
+      'Failed to search sections'
+    )
   );
 
   server.tool(
@@ -147,40 +166,45 @@ export function registerReadTools(server) {
     {
       sectionId: z.string().describe('The ID of the section to list pages from.'),
     },
-    createToolHandler(async ({ sectionId }) => {
-      const graphClient = getGraphClient();
-      const { id: validatedSectionId, resource: sectionInfo } = await validateAndFetchResource(
-        sectionId,
-        'section',
-        `/me/onenote/sections/${sectionId}`,
-        'listSections or searchSections'
-      );
-      const sectionName = sectionInfo.displayName;
+    createToolHandler(
+      session,
+      async ({ sectionId }) => {
+        const graphClient = session.getGraphClient();
+        const { id: validatedSectionId, resource: sectionInfo } = await validateAndFetchResource(
+          session,
+          sectionId,
+          'section',
+          `/me/onenote/sections/${sectionId}`,
+          'listSections or searchSections'
+        );
+        const sectionName = sectionInfo.displayName;
 
-      const response = await graphClient
-        .api(`/me/onenote/sections/${validatedSectionId}/pages`)
-        .select('id,title,lastModifiedDateTime')
-        .top(50)
-        .get();
+        const response = await graphClient
+          .api(`/me/onenote/sections/${validatedSectionId}/pages`)
+          .select('id,title,lastModifiedDateTime')
+          .top(50)
+          .get();
 
-      const pages = response.value || [];
+        const pages = response.value || [];
 
-      if (pages.length > 0) {
-        const { list, more, limitWarning } = formatItemList(pages, 'pages');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${list}${more}${limitWarning}`,
-            },
-          ],
-        };
-      } else {
-        return {
-          content: [{ type: 'text', text: `📄 No pages found in section "${sectionName}".` }],
-        };
-      }
-    }, 'Failed to list pages in section')
+        if (pages.length > 0) {
+          const { list, more, limitWarning } = formatItemList(pages, 'pages');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${list}${more}${limitWarning}`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [{ type: 'text', text: `📄 No pages found in section "${sectionName}".` }],
+          };
+        }
+      },
+      'Failed to list pages in section'
+    )
   );
 
   server.tool(
@@ -204,105 +228,109 @@ export function registerReadTools(server) {
         .describe('Filter pages within a specific notebook (must provide notebook ID).')
         .optional(),
     },
-    createToolHandler(async ({ query, modifiedAfter, modifiedBefore, notebookId }) => {
-      const graphClient = getGraphClient();
-      const filterConditions = [];
+    createToolHandler(
+      session,
+      async ({ query, modifiedAfter, modifiedBefore, notebookId }) => {
+        const graphClient = session.getGraphClient();
+        const filterConditions = [];
 
-      if (query) {
-        const escapedQuery = escapeODataString(query).toLowerCase();
-        filterConditions.push(`contains(tolower(title), '${escapedQuery}')`);
-      }
-
-      if (modifiedAfter) {
-        filterConditions.push(`lastModifiedDateTime ge ${modifiedAfter}`);
-      }
-
-      if (modifiedBefore) {
-        filterConditions.push(`lastModifiedDateTime le ${modifiedBefore}`);
-      }
-
-      if (notebookId) {
-        const validatedNotebookId = validateId(notebookId, 'notebook');
-        const sectionsResponse = await graphClient
-          .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
-          .get();
-        const sections = sectionsResponse.value || [];
-
-        if (sections.length === 0) {
-          return {
-            content: [
-              { type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` },
-            ],
-          };
+        if (query) {
+          const escapedQuery = escapeODataString(query).toLowerCase();
+          filterConditions.push(`contains(tolower(title), '${escapedQuery}')`);
         }
 
-        const sectionPagePromises = sections.map(async (section) => {
-          let sectionRequest = graphClient
-            .api(`/me/onenote/sections/${section.id}/pages`)
-            .select('id,title,lastModifiedDateTime')
-            .top(50);
+        if (modifiedAfter) {
+          filterConditions.push(`lastModifiedDateTime ge ${modifiedAfter}`);
+        }
 
-          if (filterConditions.length > 0) {
-            sectionRequest = sectionRequest.filter(filterConditions.join(' and '));
+        if (modifiedBefore) {
+          filterConditions.push(`lastModifiedDateTime le ${modifiedBefore}`);
+        }
+
+        if (notebookId) {
+          const validatedNotebookId = validateId(notebookId, 'notebook');
+          const sectionsResponse = await graphClient
+            .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
+            .get();
+          const sections = sectionsResponse.value || [];
+
+          if (sections.length === 0) {
+            return {
+              content: [
+                { type: 'text', text: `📄 No sections found in notebook. Cannot search pages.` },
+              ],
+            };
           }
 
-          const sectionPages = await sectionRequest.get();
-          return sectionPages.value || [];
-        });
+          const sectionPagePromises = sections.map(async (section) => {
+            let sectionRequest = graphClient
+              .api(`/me/onenote/sections/${section.id}/pages`)
+              .select('id,title,lastModifiedDateTime')
+              .top(50);
 
-        const sectionResults = await Promise.all(sectionPagePromises);
-        const allPages = sectionResults.flat();
-        const pages = allPages.slice(0, 50);
+            if (filterConditions.length > 0) {
+              sectionRequest = sectionRequest.filter(filterConditions.join(' and '));
+            }
+
+            const sectionPages = await sectionRequest.get();
+            return sectionPages.value || [];
+          });
+
+          const sectionResults = await Promise.all(sectionPagePromises);
+          const allPages = sectionResults.flat();
+          const pages = allPages.slice(0, 50);
+
+          if (pages.length > 0) {
+            const { list, more, limitWarning } = formatItemList(pages, 'pages');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${list}${more}${limitWarning}`,
+                },
+              ],
+            };
+          } else {
+            return {
+              content: [{ type: 'text', text: `🔍 No pages found in notebook matching criteria.` }],
+            };
+          }
+        }
+
+        let request = graphClient
+          .api('/me/onenote/pages')
+          .select('id,title,lastModifiedDateTime')
+          .top(50);
+
+        if (filterConditions.length > 0) {
+          request = request.filter(filterConditions.join(' and '));
+        }
+
+        const apiResponse = await request.get();
+        const pages = apiResponse.value || [];
 
         if (pages.length > 0) {
           const { list, more, limitWarning } = formatItemList(pages, 'pages');
+
+          let searchDesc = '';
+          if (query) searchDesc += `"${query}"`;
+          if (modifiedAfter) searchDesc += ` modified after ${modifiedAfter}`;
+          if (modifiedBefore) searchDesc += ` modified before ${modifiedBefore}`;
+
           return {
             content: [
               {
                 type: 'text',
-                text: `🔍 **Search Results** in notebook (${pages.length} found):\n\n${list}${more}${limitWarning}`,
+                text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${list}${more}${limitWarning}`,
               },
             ],
           };
         } else {
-          return {
-            content: [{ type: 'text', text: `🔍 No pages found in notebook matching criteria.` }],
-          };
+          return { content: [{ type: 'text', text: `🔍 No pages found matching criteria.` }] };
         }
-      }
-
-      let request = graphClient
-        .api('/me/onenote/pages')
-        .select('id,title,lastModifiedDateTime')
-        .top(50);
-
-      if (filterConditions.length > 0) {
-        request = request.filter(filterConditions.join(' and '));
-      }
-
-      const apiResponse = await request.get();
-      const pages = apiResponse.value || [];
-
-      if (pages.length > 0) {
-        const { list, more, limitWarning } = formatItemList(pages, 'pages');
-
-        let searchDesc = '';
-        if (query) searchDesc += `"${query}"`;
-        if (modifiedAfter) searchDesc += ` modified after ${modifiedAfter}`;
-        if (modifiedBefore) searchDesc += ` modified before ${modifiedBefore}`;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `🔍 **Search Results** ${searchDesc || ''} (${pages.length} found):\n\n${list}${more}${limitWarning}`,
-            },
-          ],
-        };
-      } else {
-        return { content: [{ type: 'text', text: `🔍 No pages found matching criteria.` }] };
-      }
-    }, 'Failed to search pages')
+      },
+      'Failed to search pages'
+    )
   );
 
   server.tool(
@@ -315,25 +343,29 @@ export function registerReadTools(server) {
         .describe('Format of the content: text (readable), html (raw), or summary (brief).')
         .optional(),
     },
-    createToolHandler(async ({ pageId, format }) => {
-      const graphClient = getGraphClient();
-      const validatedPageId = validateId(pageId, 'page');
+    createToolHandler(
+      session,
+      async ({ pageId, format }) => {
+        const graphClient = session.getGraphClient();
+        const validatedPageId = validateId(pageId, 'page');
 
-      const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
-      const htmlContent = await fetchPageContentAdvanced(validatedPageId, 'httpDirect');
-      let resultText = '';
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+        const htmlContent = await fetchPageContentAdvanced(session, validatedPageId, 'httpDirect');
+        let resultText = '';
 
-      if (format === 'html') {
-        resultText = `📄 **${pageInfo.title}** (HTML Format)\n\n${htmlContent}`;
-      } else if (format === 'summary') {
-        const summary = extractTextSummary(htmlContent, 300);
-        resultText = `📄 **${pageInfo.title}** (Summary)\n\n${summary}`;
-      } else {
-        const textContent = extractReadableText(htmlContent);
-        resultText = `📄 **${pageInfo.title}**\n📅 Modified: ${new Date(pageInfo.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
-      }
-      return { content: [{ type: 'text', text: resultText }] };
-    }, 'Failed to get page content')
+        if (format === 'html') {
+          resultText = `📄 **${pageInfo.title}** (HTML Format)\n\n${htmlContent}`;
+        } else if (format === 'summary') {
+          const summary = extractTextSummary(htmlContent, 300);
+          resultText = `📄 **${pageInfo.title}** (Summary)\n\n${summary}`;
+        } else {
+          const textContent = extractReadableText(htmlContent);
+          resultText = `📄 **${pageInfo.title}**\n📅 Modified: ${new Date(pageInfo.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
+        }
+        return { content: [{ type: 'text', text: resultText }] };
+      },
+      'Failed to get page content'
+    )
   );
 
   server.tool(
@@ -346,58 +378,62 @@ export function registerReadTools(server) {
         .describe('Format of the content: text, html, or summary.')
         .optional(),
     },
-    createToolHandler(async ({ title, format }) => {
-      const graphClient = getGraphClient();
-      const escapedTitle = escapeODataString(title).toLowerCase();
-      const pagesResponse = await graphClient
-        .api('/me/onenote/pages')
-        .filter(`contains(tolower(title), '${escapedTitle}')`)
-        .select('id,title,lastModifiedDateTime')
-        .top(50)
-        .get();
-
-      const matchingPages = pagesResponse.value || [];
-
-      if (matchingPages.length === 0) {
-        const recentPages = await graphClient
+    createToolHandler(
+      session,
+      async ({ title, format }) => {
+        const graphClient = session.getGraphClient();
+        const escapedTitle = escapeODataString(title).toLowerCase();
+        const pagesResponse = await graphClient
           .api('/me/onenote/pages')
-          .select('title')
-          .top(10)
-          .orderby('lastModifiedDateTime desc')
+          .filter(`contains(tolower(title), '${escapedTitle}')`)
+          .select('id,title,lastModifiedDateTime')
+          .top(50)
           .get();
-        const availablePages = (recentPages.value || []).map((p) => `- ${p.title}`).join('\n');
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: `❌ No page found with title containing "${title}".\n\nRecent pages (up to 10):\n${availablePages || 'None'}`,
-            },
-          ],
-        };
-      }
 
-      const matchingPage = matchingPages[0];
-      const htmlContent = await fetchPageContentAdvanced(matchingPage.id, 'httpDirect');
-      let resultText = '';
-      if (format === 'html') {
-        resultText = `📄 **${matchingPage.title}** (HTML Format)\n\n${htmlContent}`;
-      } else if (format === 'summary') {
-        const summary = extractTextSummary(htmlContent, 300);
-        resultText = `📄 **${matchingPage.title}** (Summary)\n\n${summary}`;
-      } else {
-        const textContent = extractReadableText(htmlContent);
-        resultText = `📄 **${matchingPage.title}**\n📅 Modified: ${new Date(matchingPage.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
-      }
+        const matchingPages = pagesResponse.value || [];
 
-      if (matchingPages.length > 1) {
-        resultText += `\n\n📌 Note: ${matchingPages.length} pages matched "${title}". Showing the first match.`;
-        if (matchingPages.length === 50) {
-          resultText += `\n⚠️ Reached the 50-result limit. There may be additional matches not shown.`;
+        if (matchingPages.length === 0) {
+          const recentPages = await graphClient
+            .api('/me/onenote/pages')
+            .select('title')
+            .top(10)
+            .orderby('lastModifiedDateTime desc')
+            .get();
+          const availablePages = (recentPages.value || []).map((p) => `- ${p.title}`).join('\n');
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: `❌ No page found with title containing "${title}".\n\nRecent pages (up to 10):\n${availablePages || 'None'}`,
+              },
+            ],
+          };
         }
-      }
 
-      return { content: [{ type: 'text', text: resultText }] };
-    }, 'Failed to get page by title')
+        const matchingPage = matchingPages[0];
+        const htmlContent = await fetchPageContentAdvanced(session, matchingPage.id, 'httpDirect');
+        let resultText = '';
+        if (format === 'html') {
+          resultText = `📄 **${matchingPage.title}** (HTML Format)\n\n${htmlContent}`;
+        } else if (format === 'summary') {
+          const summary = extractTextSummary(htmlContent, 300);
+          resultText = `📄 **${matchingPage.title}** (Summary)\n\n${summary}`;
+        } else {
+          const textContent = extractReadableText(htmlContent);
+          resultText = `📄 **${matchingPage.title}**\n📅 Modified: ${new Date(matchingPage.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
+        }
+
+        if (matchingPages.length > 1) {
+          resultText += `\n\n📌 Note: ${matchingPages.length} pages matched "${title}". Showing the first match.`;
+          if (matchingPages.length === 50) {
+            resultText += `\n⚠️ Reached the 50-result limit. There may be additional matches not shown.`;
+          }
+        }
+
+        return { content: [{ type: 'text', text: resultText }] };
+      },
+      'Failed to get page by title'
+    )
   );
 }

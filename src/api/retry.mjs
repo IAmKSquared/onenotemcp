@@ -1,5 +1,3 @@
-import { ensureGraphClient } from './graph-client.mjs';
-
 /**
  * Retry helper with exponential backoff for transient failures.
  * @param {Function} fn - The async function to retry.
@@ -105,19 +103,18 @@ export function getDetailedErrorMessage(error, errorPrefix) {
 
 /**
  * Creates a standardized tool handler with error handling and authentication checks.
+ * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  * @param {Function} handler - The async tool implementation function.
  * @param {string} errorPrefix - The prefix for error messages.
  * @returns {Function} A wrapped handler function compatible with McpServer.
  */
-export function createToolHandler(handler, errorPrefix = 'Tool execution failed') {
+export function createToolHandler(session, handler, errorPrefix = 'Tool execution failed') {
   return async (args) => {
     try {
       // 'authenticate' tool is a special case that establishes the session,
       // so we don't check for ensureGraphClient() inside it to avoid recursion/errors.
-      // However, since we are wrapping it manually or not wrapping it at all,
-      // this check is mostly for safety if we decide to wrap it later.
       if (handler.name !== 'authenticateHandler') {
-        await ensureGraphClient();
+        await session.ensureGraphClient();
       }
 
       // Wrap handler with retry logic for transient failures

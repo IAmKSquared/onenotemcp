@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadExistingToken } from './auth/token-manager.mjs';
-import { initializeGraphClient } from './api/graph-client.mjs';
+import { OneNoteSession } from './session.mjs';
 import { getClientId } from './auth/device-code-flow.mjs';
 import { registerAuthTools } from './tools/auth-tools.mjs';
 import { registerReadTools } from './tools/read-tools.mjs';
@@ -16,18 +15,21 @@ const server = new McpServer({
   description: 'OneNote MCP Server - Read, Write, and Edit OneNote content.',
 });
 
-// Register all tool categories
-registerAuthTools(server);
-registerReadTools(server);
-registerWriteTools(server);
-registerCreateTools(server);
+// --- Session Initialization ---
+const session = new OneNoteSession();
+
+// Register all tool categories with session
+registerAuthTools(server, session);
+registerReadTools(server, session);
+registerWriteTools(server, session);
+registerCreateTools(server, session);
 
 /**
  * Main function to initialize and start the MCP server.
  */
 async function main() {
-  await loadExistingToken(); // Attempt to load token at startup
-  initializeGraphClient(); // Initialize client if token was loaded
+  await session.loadExistingToken(); // Attempt to load token at startup
+  session.initializeGraphClient(); // Initialize client if token was loaded
 
   try {
     const transport = new StdioServerTransport();
