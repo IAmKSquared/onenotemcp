@@ -10,8 +10,8 @@ This server provides a rich set of tools for advanced OneNote management, includ
 
 *   **Authentication:** Secure device code flow for Microsoft Graph API access.
 *   **Read Operations:**
-    *   List notebooks, sections, and pages.
-    *   Search pages by title.
+    *   List notebooks, sections, section groups, and pages.
+    *   Search sections by name and pages by title.
     *   Get page content in various formats (full HTML, readable text, summary).
 *   **Write & Edit Operations:**
     *   Create new OneNote pages with custom HTML or markdown content.
@@ -141,6 +141,9 @@ This server exposes the following tools to your AI assistant:
 
 **Reading OneNote Data:**
 *   `listNotebooks`: Lists all your OneNote notebooks.
+*   `listSections`: Lists sections, optionally filtered by notebook or section group. (Args: `notebookId` (optional string), `sectionGroupId` (optional string))
+*   `listSectionGroups`: Lists section groups, optionally filtered by notebook or parent section group. (Args: `notebookId` (optional string), `sectionGroupId` (optional string))
+*   `searchSections`: Searches for sections by name. (Arg: `query` (string))
 *   `searchPages`: Searches for pages by title across all notebooks. (Arg: `query` (optional string))
 *   `getPageContent`: Retrieves the content of a specific OneNote page. (Args: `pageId` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 *   `getPageByTitle`: Finds a page by its title and retrieves its content. (Args: `title` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
@@ -159,6 +162,8 @@ This server exposes the following tools to your AI assistant:
 Once connected and authenticated, you can ask your AI assistant to perform tasks like:
 
 *   "List my OneNote notebooks."
+*   "Show me all sections in my notebook."
+*   "Search for sections containing 'Project'."
 *   "Create a new OneNote page titled 'Meeting Ideas' with the content 'Brainstorm new marketing strategies'."
 *   "Can you find my OneNote page about 'Project Phoenix' and tell me its summary?"
 *   "Append 'Follow up with John Doe' to the OneNote page with ID 'your-page-id-here'."
