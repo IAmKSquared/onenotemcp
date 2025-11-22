@@ -2,10 +2,10 @@
   "name": "onenote-mcp-server",
   "version": "1.0.0",
   "description": "An MCP server to interact with Microsoft OneNote, allowing LLMs to read, write, and edit notes.",
-  "main": "onenote-mcp.mjs",
+  "main": "src/server.mjs",
   "type": "module",
   "scripts": {
-    "start": "node onenote-mcp.mjs",
+    "start": "node src/server.mjs",
     "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
     "test:unit": "node --test test_unit.mjs",
     "test:smoke": "node test_smoke.mjs",

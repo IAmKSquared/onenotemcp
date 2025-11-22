@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const serverPath = path.join(__dirname, 'onenote-mcp.mjs');
+const serverPath = path.join(__dirname, 'src', 'server.mjs');
 
 console.log(`Starting server at: ${serverPath}`);
 
