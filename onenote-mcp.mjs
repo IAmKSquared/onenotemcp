@@ -551,6 +551,44 @@ server.tool(
 );
 
 server.tool(
+  'listPagesInSection',
+  {
+    sectionId: z.string().describe('The ID of the section to list pages from.')
+  },
+  createToolHandler(async ({ sectionId }) => {
+    // Verify the section exists and get its name
+    let sectionName;
+    try {
+      const sectionInfo = await graphClient.api(`/me/onenote/sections/${sectionId}`).get();
+      sectionName = sectionInfo.displayName;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new Error(`Section with ID "${sectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+      }
+      throw error;
+    }
+
+    const response = await graphClient.api(`/me/onenote/sections/${sectionId}/pages`)
+      .select('id,title,lastModifiedDateTime')
+      .top(50)
+      .get();
+
+    const pages = response.value || [];
+
+    if (pages.length > 0) {
+      // Display first 10 results, but keep all 50 fetched for accurate count
+      const displayPages = pages.slice(0, 10);
+      const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
+      const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
+      const limitWarning = pages.length === 50 ? `\n\n⚠️ Note: Reached the 50-result limit. There may be additional pages not shown.` : '';
+      return { content: [{ type: 'text', text: `📄 **Pages in Section "${sectionName}"** (${pages.length} found):\n\n${pageList}${more}${limitWarning}` }] };
+    } else {
+      return { content: [{ type: 'text', text: `📄 No pages found in section "${sectionName}".` }] };
+    }
+  }, 'Failed to list pages in section')
+);
+
+server.tool(
   'searchPages',
   {
     query: z.string().describe('The search term for page titles.').optional()
@@ -918,6 +956,61 @@ server.tool(
       }]
     };
   }, 'Error creating page')
+);
+
+server.tool(
+  'createPageInSection',
+  {
+    sectionId: z.string().min(1, { message: "Section ID cannot be empty." }).describe('The ID of the section to create the page in.'),
+    title: z.string().min(1, { message: "Title cannot be empty." }).describe('The title for the new page.'),
+    content: z.string().min(1, { message: "Content cannot be empty." }).describe('The content for the new page (HTML or markdown-style).')
+  },
+  createToolHandler(async ({ sectionId, title, content }) => {
+    console.error(`Attempting to create page with title: "${title}" in section: ${sectionId}`);
+
+    // Verify the section exists and get its name
+    let targetSectionName;
+    try {
+      const sectionInfo = await graphClient.api(`/me/onenote/sections/${sectionId}`).get();
+      targetSectionName = sectionInfo.displayName;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new Error(`Section with ID "${sectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+      }
+      throw error;
+    }
+
+    const htmlContent = textToHtml(content);
+    const pageHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${textToHtml(title)}</title>
+  <meta charset="utf-8">
+</head>
+<body>
+  <h1>${textToHtml(title)}</h1>
+  ${htmlContent}
+  <hr>
+  <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
+</body>
+</html>`;
+
+    const response = await graphClient
+      .api(`/me/onenote/sections/${sectionId}/pages`)
+      .header('Content-Type', 'application/xhtml+xml')
+      .post(pageHtml);
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ **Page Created Successfully!**
+**Title:** ${response.title}
+**Page ID:** ${response.id}
+**In Section:** ${targetSectionName}
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
+      }]
+    };
+  }, 'Error creating page in section')
 );
 
 // ============================================================================

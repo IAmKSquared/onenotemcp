@@ -10,7 +10,7 @@ This server provides a rich set of tools for advanced OneNote management, includ
 
 *   **Authentication:** Secure device code flow for Microsoft Graph API access.
 *   **Read Operations:**
-    *   List notebooks, sections, section groups, and pages.
+    *   List notebooks, sections, section groups, and pages within sections.
     *   Search sections by name and pages by title.
     *   Get page content in various formats (full HTML, readable text, summary).
 *   **Write & Edit Operations:**
@@ -144,12 +144,14 @@ This server exposes the following tools to your AI assistant:
 *   `listSections`: Lists sections, optionally filtered by notebook or section group. (Args: `notebookId` (optional string), `sectionGroupId` (optional string))
 *   `listSectionGroups`: Lists section groups, optionally filtered by notebook or parent section group. (Args: `notebookId` (optional string), `sectionGroupId` (optional string))
 *   `searchSections`: Searches for sections by name. (Arg: `query` (string))
+*   `listPagesInSection`: Lists all pages within a specific section. (Arg: `sectionId` (string))
 *   `searchPages`: Searches for pages by title across all notebooks. (Arg: `query` (optional string))
 *   `getPageContent`: Retrieves the content of a specific OneNote page. (Args: `pageId` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 *   `getPageByTitle`: Finds a page by its title and retrieves its content. (Args: `title` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 
 **Editing & Creating OneNote Pages:**
 *   `createPage`: Creates a new OneNote page in the first available section. (Args: `title` (string), `content` (string - HTML or markdown))
+*   `createPageInSection`: Creates a new OneNote page in a specific section. (Args: `sectionId` (string), `title` (string), `content` (string - HTML or markdown))
 *   `updatePageContent`: Replaces the entire content of an existing page. (Args: `pageId` (string), `content` (string), `preserveTitle` (boolean, optional, default: true))
 *   `appendToPage`: Adds new content to the end of an existing page. (Args: `pageId` (string), `content` (string), `addTimestamp` (boolean, optional, default: true), `addSeparator` (boolean, optional, default: true))
 *   `updatePageTitle`: Changes the title of an existing page. (Args: `pageId` (string), `newTitle` (string))
@@ -164,7 +166,9 @@ Once connected and authenticated, you can ask your AI assistant to perform tasks
 *   "List my OneNote notebooks."
 *   "Show me all sections in my notebook."
 *   "Search for sections containing 'Project'."
+*   "Show me all pages in the 'Meeting Notes' section."
 *   "Create a new OneNote page titled 'Meeting Ideas' with the content 'Brainstorm new marketing strategies'."
+*   "Create a page titled 'Action Items' in the 'Work Projects' section."
 *   "Can you find my OneNote page about 'Project Phoenix' and tell me its summary?"
 *   "Append 'Follow up with John Doe' to the OneNote page with ID 'your-page-id-here'."
 *   "In my OneNote page 'Recipe Ideas', replace all instances of 'sugar' with 'sweetener'."
