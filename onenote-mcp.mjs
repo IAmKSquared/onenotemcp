@@ -567,7 +567,9 @@ Token will be saved automatically upon successful browser authentication.`;
 
           // Encrypt before saving
           const encryptedToken = await encrypt(JSON.stringify(tokenData));
-          fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2));
+          fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2), {
+            mode: 0o600,
+          });
           console.error('🔒 Token saved securely (encrypted).');
           initializeGraphClient();
         })
