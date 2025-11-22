@@ -14,6 +14,9 @@ This server provides a rich set of tools for advanced OneNote management, includ
     *   Search sections by name and pages by title with advanced filtering.
     *   Filter pages by modification date ranges and specific notebooks.
     *   Get page content in various formats (full HTML, readable text, summary).
+*   **Notebook & Section Management:**
+    *   Create new notebooks, sections, and section groups.
+    *   Build and organize OneNote structure programmatically.
 *   **Write & Edit Operations:**
     *   Create new OneNote pages with custom HTML or markdown content.
     *   Update entire page content, preserving or replacing the title.
@@ -22,6 +25,8 @@ This server provides a rich set of tools for advanced OneNote management, includ
     *   Find and replace text within pages (case-sensitive or insensitive).
     *   Add formatted notes (like callouts or todos) to pages.
     *   Insert structured tables into pages from CSV data.
+*   **Page Management:**
+    *   Copy pages between sections.
 *   **Advanced Content Processing:**
     *   Sophisticated HTML to readable text extraction.
     *   Markdown-to-HTML conversion for page content.
@@ -150,6 +155,11 @@ This server exposes the following tools to your AI assistant:
 *   `getPageContent`: Retrieves the content of a specific OneNote page. (Args: `pageId` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 *   `getPageByTitle`: Finds a page by its title and retrieves its content. (Args: `title` (string), `format` (enum: "text", "html", "summary", optional, default: "text"))
 
+**Creating & Managing Structure:**
+*   `createNotebook`: Creates a new OneNote notebook. (Arg: `displayName` (string))
+*   `createSection`: Creates a new section in a notebook. (Args: `notebookId` (string), `displayName` (string))
+*   `createSectionGroup`: Creates a new section group in a notebook. (Args: `notebookId` (string), `displayName` (string))
+
 **Editing & Creating OneNote Pages:**
 *   `createPage`: Creates a new OneNote page in the first available section. (Args: `title` (string), `content` (string - HTML or markdown))
 *   `createPageInSection`: Creates a new OneNote page in a specific section. (Args: `sectionId` (string), `title` (string), `content` (string - HTML or markdown))
@@ -160,11 +170,16 @@ This server exposes the following tools to your AI assistant:
 *   `addNoteToPage`: Adds a formatted, timestamped note/comment to a page. (Args: `pageId` (string), `note` (string), `noteType` (enum: "note", "todo", "important", "question", optional, default: "note"), `position` (enum: "top", "bottom", optional, default: "bottom"))
 *   `addTableToPage`: Adds a formatted table to a page from CSV data. (Args: `pageId` (string), `tableData` (string - CSV), `title` (string, optional), `position` (enum: "top", "bottom", optional, default: "bottom"))
 
+**Page Management:**
+*   `copyPage`: Copies a page to a different section (asynchronous operation). (Args: `pageId` (string), `targetSectionId` (string))
+
 ## Example Interactions with AI
 
 Once connected and authenticated, you can ask your AI assistant to perform tasks like:
 
 *   "List my OneNote notebooks."
+*   "Create a new notebook called 'Work 2025'."
+*   "Create a section named 'Weekly Reports' in my Work notebook."
 *   "Show me all sections in my notebook."
 *   "Search for sections containing 'Project'."
 *   "Show me all pages in the 'Meeting Notes' section."
@@ -173,6 +188,7 @@ Once connected and authenticated, you can ask your AI assistant to perform tasks
 *   "Show me all pages in a specific notebook that contain 'meeting' in the title."
 *   "Create a new OneNote page titled 'Meeting Ideas' with the content 'Brainstorm new marketing strategies'."
 *   "Create a page titled 'Action Items' in the 'Work Projects' section."
+*   "Copy this page to the 'Archive' section."
 *   "Can you find my OneNote page about 'Project Phoenix' and tell me its summary?"
 *   "Append 'Follow up with John Doe' to the OneNote page with ID 'your-page-id-here'."
 *   "In my OneNote page 'Recipe Ideas', replace all instances of 'sugar' with 'sweetener'."

@@ -1163,6 +1163,156 @@ server.tool(
   }, 'Error creating page in section')
 );
 
+// --- Notebook/Section Creation Tools ---
+server.tool(
+  'createNotebook',
+  {
+    displayName: z.string().min(1, { message: "Notebook name cannot be empty." }).describe('The name for the new notebook.')
+  },
+  createToolHandler(async ({ displayName }) => {
+    console.error(`Creating notebook: "${displayName}"`);
+
+    const response = await graphClient
+      .api('/me/onenote/notebooks')
+      .post({ displayName });
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ **Notebook Created Successfully!**
+**Name:** ${response.displayName}
+**Notebook ID:** ${response.id}
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
+      }]
+    };
+  }, 'Error creating notebook')
+);
+
+server.tool(
+  'createSection',
+  {
+    notebookId: z.string().min(1, { message: "Notebook ID cannot be empty." }).describe('The ID of the notebook to create the section in.'),
+    displayName: z.string().min(1, { message: "Section name cannot be empty." }).describe('The name for the new section.')
+  },
+  createToolHandler(async ({ notebookId, displayName }) => {
+    // Validate the notebook ID
+    const validatedNotebookId = validateId(notebookId, 'notebook');
+
+    console.error(`Creating section "${displayName}" in notebook: ${validatedNotebookId}`);
+
+    // Verify the notebook exists
+    try {
+      await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new Error(`Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`);
+      }
+      throw error;
+    }
+
+    const response = await graphClient
+      .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
+      .post({ displayName });
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ **Section Created Successfully!**
+**Name:** ${response.displayName}
+**Section ID:** ${response.id}
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
+      }]
+    };
+  }, 'Error creating section')
+);
+
+server.tool(
+  'createSectionGroup',
+  {
+    notebookId: z.string().min(1, { message: "Notebook ID cannot be empty." }).describe('The ID of the notebook to create the section group in.'),
+    displayName: z.string().min(1, { message: "Section group name cannot be empty." }).describe('The name for the new section group.')
+  },
+  createToolHandler(async ({ notebookId, displayName }) => {
+    // Validate the notebook ID
+    const validatedNotebookId = validateId(notebookId, 'notebook');
+
+    console.error(`Creating section group "${displayName}" in notebook: ${validatedNotebookId}`);
+
+    // Verify the notebook exists
+    try {
+      await graphClient.api(`/me/onenote/notebooks/${validatedNotebookId}`).get();
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new Error(`Notebook with ID "${validatedNotebookId}" not found. Use listNotebooks to find valid notebook IDs.`);
+      }
+      throw error;
+    }
+
+    const response = await graphClient
+      .api(`/me/onenote/notebooks/${validatedNotebookId}/sectionGroups`)
+      .post({ displayName });
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ **Section Group Created Successfully!**
+**Name:** ${response.displayName}
+**Section Group ID:** ${response.id}
+**Created:** ${new Date(response.createdDateTime).toLocaleString()}`
+      }]
+    };
+  }, 'Error creating section group')
+);
+
+// --- Page Management Tools ---
+server.tool(
+  'copyPage',
+  {
+    pageId: z.string().describe('The ID of the page to copy.'),
+    targetSectionId: z.string().describe('The ID of the section to copy the page to.')
+  },
+  createToolHandler(async ({ pageId, targetSectionId }) => {
+    // Validate IDs
+    const validatedPageId = validateId(pageId, 'page');
+    const validatedSectionId = validateId(targetSectionId, 'section');
+
+    console.error(`Copying page ${validatedPageId} to section ${validatedSectionId}`);
+
+    // Get page title for display
+    const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+
+    // Verify target section exists
+    let targetSectionName;
+    try {
+      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
+      targetSectionName = sectionInfo.displayName;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new Error(`Target section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+      }
+      throw error;
+    }
+
+    // Initiate copy operation (async)
+    const copyResponse = await graphClient
+      .api(`/me/onenote/pages/${validatedPageId}/copyToSection`)
+      .post({ id: validatedSectionId });
+
+    // The copy operation returns 202 Accepted with Operation-Location header
+    // For simplicity, we return success immediately without polling
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ **Page Copy Initiated!**
+**Original Page:** ${pageInfo.title}
+**Target Section:** ${targetSectionName}
+
+⚠️ Note: Copy is an asynchronous operation. The page will appear in the target section shortly.`
+      }]
+    };
+  }, 'Error copying page')
+);
+
 // ============================================================================
 // SERVER STARTUP
 // ============================================================================
