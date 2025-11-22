@@ -250,16 +250,45 @@ function extractTextSummary(html, maxLength = 300) {
 }
 
 /**
+ * Sanitizes a URL to prevent XSS attacks in href attributes.
+ * Only allows safe protocols: http, https, mailto.
+ * @param {string} url - The URL to sanitize.
+ * @returns {string} The sanitized URL or '#' if unsafe.
+ */
+function sanitizeUrl(url) {
+  if (!url) return '#';
+  const trimmed = url.trim();
+
+  // Check for safe protocols
+  const safeProtocols = /^(https?:\/\/|mailto:)/i;
+  const hasProtocol = /^[a-z][a-z0-9+.-]*:/i.test(trimmed);
+
+  // If it has a protocol, ensure it's safe
+  if (hasProtocol) {
+    if (safeProtocols.test(trimmed)) {
+      return trimmed;
+    }
+    // Dangerous protocol (javascript:, data:, etc.)
+    return '#';
+  }
+
+  // No protocol - treat as relative URL (safe)
+  return trimmed;
+}
+
+/**
  * Converts plain text (with simple markdown) to HTML.
  * @param {string} text - The plain text to convert.
  * @returns {string} The HTML representation.
  */
 function textToHtml(text) {
   if (!text) return '';
-  if (text.includes('<html>') || text.includes('<!DOCTYPE html>')) return text; // Already HTML
+
+  // Security: Never bypass escaping, even if input looks like HTML
+  // All user input must be escaped to prevent XSS
 
   let html = String(text) // Ensure text is a string
-    .replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>') // Basic HTML escaping first
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // Basic HTML escaping first
     .replace(/```([\s\S]*?)```/g, (match, code) => `<pre><code>${code.trim()}</code></pre>`)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -267,7 +296,10 @@ function textToHtml(text) {
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+      const safeUrl = sanitizeUrl(url);
+      return `<a href="${safeUrl}">${linkText}</a>`;
+    })
     .replace(/^---+$/gm, '<hr>')
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^[\*\-\+] (.+)$/gm, '<li>$1</li>')
@@ -304,6 +336,49 @@ function escapeODataString(str) {
 }
 
 /**
+ * Validates that an ID matches expected Microsoft Graph ID patterns.
+ * Accepts GUIDs and URL-safe base64 encoded IDs.
+ * @param {string} id - The ID to validate.
+ * @param {string} type - The type of ID (e.g., 'page', 'section', 'notebook') for error messages.
+ * @throws {Error} If the ID format is invalid.
+ */
+function validateId(id, type = 'resource') {
+  if (!id || typeof id !== 'string') {
+    throw new Error(`Invalid ${type} ID: ID must be a non-empty string.`);
+  }
+
+  // Trim the ID
+  const trimmedId = id.trim();
+
+  if (trimmedId.length === 0) {
+    throw new Error(`Invalid ${type} ID: ID cannot be empty or only whitespace.`);
+  }
+
+  // Check for reasonable length (Microsoft Graph IDs are typically 20-100 chars)
+  if (trimmedId.length < 10 || trimmedId.length > 200) {
+    throw new Error(`Invalid ${type} ID: ID length out of expected range (10-200 characters).`);
+  }
+
+  // Check for common invalid patterns that could indicate injection attempts
+  const dangerousPatterns = [
+    /<script/i,           // Script tags
+    /javascript:/i,       // JavaScript protocol
+    /\.\./,               // Path traversal
+    /[<>"'`]/,           // HTML/quote characters that shouldn't be in IDs
+    /[\r\n]/,            // Newlines
+    /\s{2,}/             // Multiple consecutive spaces
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(trimmedId)) {
+      throw new Error(`Invalid ${type} ID: ID contains invalid characters or patterns.`);
+    }
+  }
+
+  return trimmedId;
+}
+
+/**
  * Fetches the content of a OneNote page.
  * @param {string} pageId - The ID of the page.
  * @param {'httpDirect' | 'direct'} [method='httpDirect'] - The method to use for fetching.
@@ -312,7 +387,7 @@ function escapeODataString(str) {
 async function fetchPageContentAdvanced(pageId, method = 'httpDirect') {
   await ensureGraphClient();
   if (method === 'httpDirect') {
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
     if (!response.ok) throw new Error(`HTTP error fetching page content! Status: ${response.status} ${response.statusText}`);
     return await response.text();
@@ -556,19 +631,22 @@ server.tool(
     sectionId: z.string().describe('The ID of the section to list pages from.')
   },
   createToolHandler(async ({ sectionId }) => {
+    // Validate the section ID
+    const validatedSectionId = validateId(sectionId, 'section');
+
     // Verify the section exists and get its name
     let sectionName;
     try {
-      const sectionInfo = await graphClient.api(`/me/onenote/sections/${sectionId}`).get();
+      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
       sectionName = sectionInfo.displayName;
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Section with ID "${sectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        throw new Error(`Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
       }
       throw error;
     }
 
-    const response = await graphClient.api(`/me/onenote/sections/${sectionId}/pages`)
+    const response = await graphClient.api(`/me/onenote/sections/${validatedSectionId}/pages`)
       .select('id,title,lastModifiedDateTime')
       .top(50)
       .get();
@@ -630,8 +708,11 @@ server.tool(
       .optional()
   },
   createToolHandler(async ({ pageId, format }) => {
-    const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-    const htmlContent = await fetchPageContentAdvanced(pageId, 'httpDirect');
+    // Validate the page ID
+    const validatedPageId = validateId(pageId, 'page');
+
+    const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+    const htmlContent = await fetchPageContentAdvanced(validatedPageId, 'httpDirect');
     let resultText = '';
 
     if (format === 'html') {
@@ -715,8 +796,11 @@ server.tool(
       .optional()
   },
   createToolHandler(async ({ pageId, content: newContent, preserveTitle }) => {
-    const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-    console.error(`Updating content for page: "${pageInfo.title}" (ID: ${pageId})`);
+    // Validate the page ID
+    const validatedPageId = validateId(pageId, 'page');
+
+    const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+    console.error(`Updating content for page: "${pageInfo.title}" (ID: ${validatedPageId})`);
 
     const htmlContentForUpdate = textToHtml(newContent);
     const finalHtml = `
@@ -728,7 +812,7 @@ server.tool(
       </div>
     `;
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(validatedPageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -759,7 +843,7 @@ server.tool(
     if (addTimestamp) appendHtml += `<p><em>Added on ${new Date().toLocaleString()}</em></p>`;
     appendHtml += htmlContentToAppend;
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -783,7 +867,7 @@ server.tool(
     const oldTitle = pageInfo.title;
     console.error(`Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`);
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -818,7 +902,7 @@ server.tool(
     }
 
     const updatedContent = htmlContent.replace(regex, replaceText);
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -858,7 +942,7 @@ server.tool(
       </div>`;
 
     const action = position === 'top' ? 'prepend' : 'append';
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -895,7 +979,7 @@ server.tool(
     tableHtml += `<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead><tr style="background-color: #f5f5f5;">${headerRow.map(cell => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${textToHtml(cell)}</th>`).join('')}</tr></thead><tbody>${dataRows.map(row => `<tr>${row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${textToHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
     const action = position === 'top' ? 'prepend' : 'append';
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${pageId}/content`;
+    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -966,16 +1050,19 @@ server.tool(
     content: z.string().min(1, { message: "Content cannot be empty." }).describe('The content for the new page (HTML or markdown-style).')
   },
   createToolHandler(async ({ sectionId, title, content }) => {
-    console.error(`Attempting to create page with title: "${title}" in section: ${sectionId}`);
+    // Validate the section ID
+    const validatedSectionId = validateId(sectionId, 'section');
+
+    console.error(`Attempting to create page with title: "${title}" in section: ${validatedSectionId}`);
 
     // Verify the section exists and get its name
     let targetSectionName;
     try {
-      const sectionInfo = await graphClient.api(`/me/onenote/sections/${sectionId}`).get();
+      const sectionInfo = await graphClient.api(`/me/onenote/sections/${validatedSectionId}`).get();
       targetSectionName = sectionInfo.displayName;
     } catch (error) {
       if (error.statusCode === 404) {
-        throw new Error(`Section with ID "${sectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
+        throw new Error(`Section with ID "${validatedSectionId}" not found. Use listSections or searchSections to find valid section IDs.`);
       }
       throw error;
     }
@@ -996,7 +1083,7 @@ server.tool(
 </html>`;
 
     const response = await graphClient
-      .api(`/me/onenote/sections/${sectionId}/pages`)
+      .api(`/me/onenote/sections/${validatedSectionId}/pages`)
       .header('Content-Type', 'application/xhtml+xml')
       .post(pageHtml);
 
