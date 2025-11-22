@@ -173,8 +173,16 @@ export class Cache {
   }
 
   invalidate(keyOrPattern) {
-    if (typeof keyOrPattern === 'string') {
+    if (keyOrPattern instanceof RegExp) {
+      // Support RegExp patterns
+      for (const key of this.cache.keys()) {
+        if (keyOrPattern.test(key)) {
+          this.cache.delete(key);
+        }
+      }
+    } else if (typeof keyOrPattern === 'string') {
       if (keyOrPattern.includes('*')) {
+        // Support wildcard strings like "user:*"
         const pattern = new RegExp('^' + keyOrPattern.replace(/\*/g, '.*') + '$');
         for (const key of this.cache.keys()) {
           if (pattern.test(key)) {
@@ -182,6 +190,7 @@ export class Cache {
           }
         }
       } else {
+        // Exact key match
         this.cache.delete(keyOrPattern);
       }
     }

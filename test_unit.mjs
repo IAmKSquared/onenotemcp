@@ -360,7 +360,7 @@ describe('Cache', () => {
     assert.strictEqual(cache.get('key2'), 'value2');
   });
 
-  test('should invalidate keys by pattern', () => {
+  test('should invalidate keys by wildcard pattern', () => {
     const cache = new Cache();
     cache.set('user:1', 'data1');
     cache.set('user:2', 'data2');
@@ -370,6 +370,21 @@ describe('Cache', () => {
 
     assert.strictEqual(cache.get('user:1'), undefined);
     assert.strictEqual(cache.get('user:2'), undefined);
+    assert.strictEqual(cache.get('post:1'), 'post1');
+  });
+
+  test('should invalidate keys by RegExp pattern', () => {
+    const cache = new Cache();
+    cache.set('user:1', 'data1');
+    cache.set('user:2', 'data2');
+    cache.set('admin:1', 'admin1');
+    cache.set('post:1', 'post1');
+
+    cache.invalidate(/^(user|admin):/);
+
+    assert.strictEqual(cache.get('user:1'), undefined);
+    assert.strictEqual(cache.get('user:2'), undefined);
+    assert.strictEqual(cache.get('admin:1'), undefined);
     assert.strictEqual(cache.get('post:1'), 'post1');
   });
 

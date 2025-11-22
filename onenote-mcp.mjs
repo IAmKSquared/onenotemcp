@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { z } from "zod";
 import crypto from 'crypto';
-import { escapeODataString, sanitizeUrl, textToHtml, validateId } from './utils.mjs';
+import { escapeODataString, sanitizeUrl, textToHtml, validateId, Cache } from './utils.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -176,71 +176,6 @@ async function ensureGraphClient() {
 // ============================================================================
 // CACHING LAYER
 // ============================================================================
-
-/**
- * Simple in-memory cache with TTL (time-to-live) for API responses.
- */
-class Cache {
-  constructor() {
-    this.cache = new Map();
-    this.defaultTTL = 5 * 60 * 1000; // 5 minutes in milliseconds
-  }
-
-  /**
-   * Gets a cached value if it exists and hasn't expired.
-   * @param {string} key - The cache key.
-   * @returns {any} The cached value or undefined if not found or expired.
-   */
-  get(key) {
-    const item = this.cache.get(key);
-    if (!item) return undefined;
-
-    // Check if expired
-    if (Date.now() > item.expiry) {
-      this.cache.delete(key);
-      return undefined;
-    }
-
-    return item.value;
-  }
-
-  /**
-   * Sets a value in the cache with optional TTL.
-   * @param {string} key - The cache key.
-   * @param {any} value - The value to cache.
-   * @param {number} [ttl] - Time-to-live in milliseconds (defaults to 5 minutes).
-   */
-  set(key, value, ttl = this.defaultTTL) {
-    this.cache.set(key, {
-      value,
-      expiry: Date.now() + ttl
-    });
-  }
-
-  /**
-   * Invalidates a specific cache key or pattern.
-   * @param {string|RegExp} keyOrPattern - The key or pattern to invalidate.
-   */
-  invalidate(keyOrPattern) {
-    if (typeof keyOrPattern === 'string') {
-      this.cache.delete(keyOrPattern);
-    } else if (keyOrPattern instanceof RegExp) {
-      // Invalidate all keys matching the pattern
-      for (const key of this.cache.keys()) {
-        if (keyOrPattern.test(key)) {
-          this.cache.delete(key);
-        }
-      }
-    }
-  }
-
-  /**
-   * Clears all cached items.
-   */
-  clear() {
-    this.cache.clear();
-  }
-}
 
 // Global cache instance
 const apiCache = new Cache();
