@@ -271,6 +271,33 @@ function formatItemList(items, itemType = 'items', maxDisplay = 10, apiLimit = 5
   return { list, more, limitWarning };
 }
 
+/**
+ * Sends a PATCH request to update OneNote page content.
+ * Handles the common pattern of PATCH operations for page modifications.
+ * @param {string} pageId - The ID of the page to update.
+ * @param {Array} operations - Array of operations (e.g., [{target: 'body', action: 'append', content: '...'}]).
+ * @param {string} [errorPrefix] - Custom error message prefix. Defaults to 'PATCH operation failed'.
+ * @returns {Promise<object>} The fetch response object.
+ * @throws {Error} If the PATCH request fails.
+ */
+async function patchPageContent(pageId, operations, errorPrefix = 'PATCH operation failed') {
+  const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(operations),
+  });
+
+  if (!response.ok) {
+    throw new Error(`${errorPrefix}: ${response.status} ${response.statusText}`);
+  }
+
+  return response;
+}
+
 // ============================================================================
 // TOOL HANDLER WRAPPER
 // ============================================================================
@@ -955,14 +982,11 @@ server.tool(
       </div>
     `;
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(validatedPageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: 'replace', content: finalHtml }]),
-    });
-
-    if (!response.ok) throw new Error(`Update failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      validatedPageId,
+      [{ target: 'body', action: 'replace', content: finalHtml }],
+      'Update failed'
+    );
 
     return {
       content: [
@@ -997,14 +1021,11 @@ server.tool(
     if (addTimestamp) appendHtml += `<p><em>Added on ${new Date().toLocaleString()}</em></p>`;
     appendHtml += htmlContentToAppend;
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: 'append', content: appendHtml }]),
-    });
-
-    if (!response.ok) throw new Error(`Append failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      pageId,
+      [{ target: 'body', action: 'append', content: appendHtml }],
+      'Append failed'
+    );
 
     return {
       content: [
@@ -1030,15 +1051,11 @@ server.tool(
       `Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`
     );
 
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'title', action: 'replace', content: newTitle }]),
-    });
-
-    if (!response.ok)
-      throw new Error(`Title update failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      pageId,
+      [{ target: 'title', action: 'replace', content: newTitle }],
+      'Title update failed'
+    );
 
     return {
       content: [
@@ -1084,16 +1101,11 @@ server.tool(
     }
 
     const updatedContent = htmlContent.replace(regex, replaceText);
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([
-        { target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` },
-      ]),
-    });
-
-    if (!response.ok) throw new Error(`Replace failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      pageId,
+      [{ target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` }],
+      'Replace failed'
+    );
 
     return {
       content: [
@@ -1135,14 +1147,11 @@ server.tool(
       </div>`;
 
     const action = position === 'top' ? 'prepend' : 'append';
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: action, content: noteHtml }]),
-    });
-
-    if (!response.ok) throw new Error(`Add note failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      pageId,
+      [{ target: 'body', action: action, content: noteHtml }],
+      'Add note failed'
+    );
 
     return {
       content: [
@@ -1184,15 +1193,11 @@ server.tool(
     tableHtml += `<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead><tr style="background-color: #f5f5f5;">${headerRow.map((cell) => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${textToHtml(cell)}</th>`).join('')}</tr></thead><tbody>${dataRows.map((row) => `<tr>${row.map((cell) => `<td style="border: 1px solid #ddd; padding: 8px;">${textToHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
     const action = position === 'top' ? 'prepend' : 'append';
-    const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ target: 'body', action: action, content: tableHtml }]),
-    });
-
-    if (!response.ok)
-      throw new Error(`Add table failed: ${response.status} ${response.statusText}`);
+    await patchPageContent(
+      pageId,
+      [{ target: 'body', action: action, content: tableHtml }],
+      'Add table failed'
+    );
 
     return {
       content: [
