@@ -10,6 +10,7 @@ import {
   sanitizeUrl,
   validateId,
   htmlToText,
+  extractTextSummary,
   textToHtml,
   Cache
 } from './utils.mjs';
@@ -212,6 +213,59 @@ describe('htmlToText', () => {
     const text = htmlToText(html);
     // Should not have more than double newlines
     assert.strictEqual(text.includes('\n\n\n'), false);
+  });
+});
+
+describe('extractTextSummary', () => {
+  test('should extract summary from HTML', () => {
+    const html = '<p>This is a test paragraph with some content.</p>';
+    const summary = extractTextSummary(html, 20);
+    assert.strictEqual(summary, 'This is a test parag...');
+  });
+
+  test('should use default max length of 300', () => {
+    const longText = 'a'.repeat(400);
+    const html = `<p>${longText}</p>`;
+    const summary = extractTextSummary(html);
+    assert.strictEqual(summary.length, 303); // 300 chars + '...'
+    assert.strictEqual(summary.endsWith('...'), true);
+  });
+
+  test('should not add ellipsis if text is shorter than max length', () => {
+    const html = '<p>Short text</p>';
+    const summary = extractTextSummary(html, 100);
+    assert.strictEqual(summary, 'Short text');
+    assert.strictEqual(summary.endsWith('...'), false);
+  });
+
+  test('should handle empty HTML', () => {
+    assert.strictEqual(extractTextSummary(''), 'No content to summarize.');
+    assert.strictEqual(extractTextSummary(null), 'No content to summarize.');
+  });
+
+  test('should handle HTML with no body text', () => {
+    const html = '<html><body></body></html>';
+    assert.strictEqual(extractTextSummary(html), 'No text content found in HTML body.');
+  });
+
+  test('should normalize whitespace', () => {
+    const html = '<p>Text   with    multiple     spaces</p>';
+    const summary = extractTextSummary(html, 50);
+    assert.strictEqual(summary, 'Text with multiple spaces');
+  });
+
+  test('should extract text from complex HTML', () => {
+    const html = '<div><h1>Title</h1><p>First paragraph.</p><p>Second paragraph.</p></div>';
+    const summary = extractTextSummary(html, 30);
+    assert.strictEqual(summary.startsWith('TitleFirst paragraph.'), true);
+    assert.strictEqual(summary.endsWith('...'), true);
+  });
+
+  test('should handle HTML with scripts and styles', () => {
+    const html = '<html><head><style>body{color:red}</style></head><body><p>Content</p><script>alert(1)</script></body></html>';
+    const summary = extractTextSummary(html, 50);
+    assert.strictEqual(summary.includes('alert'), true); // textContent includes script text
+    assert.strictEqual(summary.includes('Content'), true);
   });
 });
 

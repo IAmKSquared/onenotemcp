@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { z } from "zod";
 import crypto from 'crypto';
-import { escapeODataString, sanitizeUrl, textToHtml, validateId, Cache } from './utils.mjs';
+import { escapeODataString, sanitizeUrl, textToHtml, validateId, Cache, extractTextSummary } from './utils.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -258,27 +258,6 @@ function extractReadableText(html) {
   } catch (error) {
     console.error(`Error extracting readable text: ${error.message}`);
     return 'Error: Could not extract readable text from HTML content.';
-  }
-}
-
-/**
- * Extracts a short summary from HTML content.
- * @param {string} html - The HTML content string.
- * @param {number} [maxLength=300] - The maximum length of the summary.
- * @returns {string} A text summary.
- */
-function extractTextSummary(html, maxLength = 300) {
-  try {
-    if (!html) return 'No content to summarize.';
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
-    const bodyText = document.body?.textContent?.trim().replace(/\s+/g, ' ') || '';
-    if (!bodyText) return 'No text content found in HTML body.';
-    const summary = bodyText.substring(0, maxLength);
-    return summary.length < bodyText.length ? `${summary}...` : summary;
-  } catch (error) {
-    console.error(`Error extracting text summary: ${error.message}`);
-    return 'Could not extract text summary.';
   }
 }
 

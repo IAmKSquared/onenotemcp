@@ -77,6 +77,27 @@ export function validateId(id, type = 'resource') {
 }
 
 /**
+ * Extracts a short summary from HTML content
+ * @param {string} html - The HTML content string
+ * @param {number} [maxLength=300] - The maximum length of the summary
+ * @returns {string} A text summary
+ */
+export function extractTextSummary(html, maxLength = 300) {
+  try {
+    if (!html) return 'No content to summarize.';
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+    const bodyText = document.body?.textContent?.trim().replace(/\s+/g, ' ') || '';
+    if (!bodyText) return 'No text content found in HTML body.';
+    const summary = bodyText.substring(0, maxLength);
+    return summary.length < bodyText.length ? `${summary}...` : summary;
+  } catch (error) {
+    console.error(`Error extracting text summary: ${error.message}`);
+    return 'Could not extract text summary.';
+  }
+}
+
+/**
  * Converts HTML content to readable plain text
  * @param {string} html - The HTML string to convert
  * @returns {string} Plain text content
