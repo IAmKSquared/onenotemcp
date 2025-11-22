@@ -293,6 +293,17 @@ function textToHtml(text) {
 // ============================================================================
 
 /**
+ * Escapes a string for use in OData queries to prevent injection attacks.
+ * Single quotes in OData must be escaped by doubling them.
+ * @param {string} str - The string to escape.
+ * @returns {string} The escaped string safe for OData queries.
+ */
+function escapeODataString(str) {
+  if (!str) return '';
+  return str.replace(/'/g, "''");
+}
+
+/**
  * Fetches the content of a OneNote page.
  * @param {string} pageId - The ID of the page.
  * @param {'httpDirect' | 'direct'} [method='httpDirect'] - The method to use for fetching.
@@ -515,16 +526,21 @@ server.tool(
     query: z.string().describe('The search term for section names.')
   },
   createToolHandler(async ({ query }) => {
-    const response = await graphClient.api('/me/onenote/sections').get();
-    let sections = response.value || [];
+    // Escape the query to prevent OData injection and convert to lowercase for case-insensitive search
+    const escapedQuery = escapeODataString(query).toLowerCase();
 
-    if (query) {
-      const searchTerm = query.toLowerCase();
-      sections = sections.filter(s => (s.displayName || s.title || '').toLowerCase().includes(searchTerm));
-    }
+    const response = await graphClient.api('/me/onenote/sections')
+      .filter(`contains(tolower(displayName), '${escapedQuery}')`)
+      .select('id,displayName,parentNotebook,parentSectionGroup')
+      .top(50)
+      .get();
+
+    const sections = response.value || [];
 
     if (sections.length > 0) {
-      const list = sections.slice(0, 10).map((item, i) => formatPageInfo(item, i)).join('\n\n');
+      // Display first 10 results, but keep all 50 fetched for accurate count
+      const displaySections = sections.slice(0, 10);
+      const list = displaySections.map((item, i) => formatPageInfo(item, i)).join('\n\n');
       const more = sections.length > 10 ? `\n\n... and ${sections.length - 10} more.` : '';
       return { content: [{ type: 'text', text: `🔍 **Section Search Results** for "${query}" (${sections.length} found):\n\n${list}${more}` }] };
     } else {
@@ -539,16 +555,25 @@ server.tool(
     query: z.string().describe('The search term for page titles.').optional()
   },
   createToolHandler(async ({ query }) => {
-    const apiResponse = await graphClient.api('/me/onenote/pages').get();
-    let pages = apiResponse.value || [];
+    let request = graphClient.api('/me/onenote/pages')
+      .select('id,title,lastModifiedDateTime')
+      .top(50);
+
     if (query) {
-      const searchTerm = query.toLowerCase();
-      pages = pages.filter(page => page.title && page.title.toLowerCase().includes(searchTerm));
+      // Escape the query to prevent OData injection and convert to lowercase for case-insensitive search
+      const escapedQuery = escapeODataString(query).toLowerCase();
+      request = request.filter(`contains(tolower(title), '${escapedQuery}')`);
     }
+
+    const apiResponse = await request.get();
+    const pages = apiResponse.value || [];
+
     if (pages.length > 0) {
-      const pageList = pages.slice(0, 10).map((page, i) => formatPageInfo(page, i)).join('\n\n');
-      const morePages = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
-      return { content: [{ type: 'text', text: `🔍 **Search Results** ${query ? `for "${query}"` : ''} (${pages.length} found):\n\n${pageList}${morePages}` }] };
+      // Display first 10 results, but keep all 50 fetched for accurate count
+      const displayPages = pages.slice(0, 10);
+      const pageList = displayPages.map((page, i) => formatPageInfo(page, i)).join('\n\n');
+      const more = pages.length > 10 ? `\n\n... and ${pages.length - 10} more pages.` : '';
+      return { content: [{ type: 'text', text: `🔍 **Search Results** ${query ? `for "${query}"` : ''} (${pages.length} found):\n\n${pageList}${more}` }] };
     } else {
       return { content: [{ type: 'text', text: query ? `🔍 No pages found matching "${query}".` : '📄 No pages found.' }] };
     }
@@ -592,14 +617,29 @@ server.tool(
       .optional()
   },
   createToolHandler(async ({ title, format }) => {
-    const pagesResponse = await graphClient.api('/me/onenote/pages').get();
-    const matchingPage = (pagesResponse.value || []).find(p => p.title && p.title.toLowerCase().includes(title.toLowerCase()));
+    // Use server-side filtering with proper escaping and case-insensitive search
+    const escapedTitle = escapeODataString(title).toLowerCase();
+    const pagesResponse = await graphClient.api('/me/onenote/pages')
+      .filter(`contains(tolower(title), '${escapedTitle}')`)
+      .select('id,title,lastModifiedDateTime')
+      .top(50)
+      .get();
 
-    if (!matchingPage) {
-      const availablePages = (pagesResponse.value || []).slice(0, 10).map(p => `- ${p.title}`).join('\n');
-      return { isError: true, content: [{ type: 'text', text: `❌ No page found with title containing "${title}".\n\nAvailable pages (up to 10):\n${availablePages || 'None'}` }] };
+    const matchingPages = pagesResponse.value || [];
+
+    if (matchingPages.length === 0) {
+      // Fetch a few recent pages to show as alternatives
+      const recentPages = await graphClient.api('/me/onenote/pages')
+        .select('title')
+        .top(10)
+        .orderby('lastModifiedDateTime desc')
+        .get();
+      const availablePages = (recentPages.value || []).map(p => `- ${p.title}`).join('\n');
+      return { isError: true, content: [{ type: 'text', text: `❌ No page found with title containing "${title}".\n\nRecent pages (up to 10):\n${availablePages || 'None'}` }] };
     }
 
+    // Use the first matching page
+    const matchingPage = matchingPages[0];
     const htmlContent = await fetchPageContentAdvanced(matchingPage.id, 'httpDirect');
     let resultText = '';
     if (format === 'html') {
@@ -611,11 +651,15 @@ server.tool(
       const textContent = extractReadableText(htmlContent);
       resultText = `📄 **${matchingPage.title}**\n📅 Modified: ${new Date(matchingPage.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
     }
+
+    // If multiple matches, add a note
+    if (matchingPages.length > 1) {
+      resultText += `\n\n📌 Note: ${matchingPages.length} pages matched "${title}". Showing the first match.`;
+    }
+
     return { content: [{ type: 'text', text: resultText }] };
   }, 'Failed to get page by title')
 );
-
-// --- Page Editing & Content Manipulation Tools ---
 
 server.tool(
   'updatePageContent',

@@ -187,20 +187,9 @@ Once connected and authenticated, you can ask your AI assistant to perform tasks
 *   **Azure Client ID:** If you create your own Azure App Registration, keep its client secret (if any generated for other flows) secure. For this device code flow, a client secret is not used by this script.
 *   **Permissions:** This server requests `Notes.ReadWrite` and `Notes.Create` permissions. Be aware of the access you are granting.
 
-## Acknowledgements
 
-This project was developed with inspiration and by adapting patterns from the following open-source projects:
-
-*   **[onenote-mcp](https://github.com/danosb/onenote-mcp) by danosb:** This project served as an early inspiration and provided reference for structuring a OneNote MCP server, particularly for initial concepts around authentication and basic OneNote operations.
-
-
-*   **[azure-onenote-mcp-server](https://github.com/ZubeidHendricks/azure-onenote-mcp-server) by Zubeid Hendricks:** The core authentication flow using Device Code Credentials, token storage/retrieval strategy, and foundational patterns for wrapping Microsoft Graph API calls for OneNote (such as listing entities and creating pages) as MCP tools were significantly informed by or adapted from this project. This project is licensed under the MIT License.
-
-The extensive set of editing tools, advanced text extraction and HTML processing utilities, Zod schema integration, and the overall refined structure of this server are original contributions. 
-
-Development of this server was also assisted by AI language models, including Anthropic's Claude and Google's Gemini, for tasks such as code generation, refactoring, debugging, and documentation.
-
-We are grateful to the authors of the referenced projects and the developers of the AI tools for their contributions to the open-source and development communities.
+## Fork Information
+This is a fork of [onenotemcp](https://github.com/eshlon/onenotemcp) by Ehsan Shahabi.
 
 ## License
 
