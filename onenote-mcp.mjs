@@ -350,6 +350,29 @@ async function validateAndFetchResource(id, resourceType, endpoint, listToolSugg
   }
 }
 
+/**
+ * Creates a complete HTML document for a OneNote page.
+ * @param {string} title - The page title.
+ * @param {string} content - The page content (plain text or markdown).
+ * @returns {string} Complete HTML document ready for OneNote API.
+ */
+function createPageHtml(title, content) {
+  const htmlContent = textToHtml(content);
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>${textToHtml(title)}</title>
+  <meta charset="utf-8">
+</head>
+<body>
+  <h1>${textToHtml(title)}</h1>
+  ${htmlContent}
+  <hr>
+  <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
+</body>
+</html>`;
+}
+
 // ============================================================================
 // TOOL HANDLER WRAPPER
 // ============================================================================
@@ -1274,20 +1297,7 @@ server.tool(
     const targetSectionId = sectionsResponse.value[0].id;
     const targetSectionName = sectionsResponse.value[0].displayName;
 
-    const htmlContent = textToHtml(content);
-    const pageHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <title>${textToHtml(title)}</title>
-  <meta charset="utf-8">
-</head>
-<body>
-  <h1>${textToHtml(title)}</h1>
-  ${htmlContent}
-  <hr>
-  <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
-</body>
-</html>`;
+    const pageHtml = createPageHtml(title, content);
 
     const response = await graphClient
       .api(`/me/onenote/sections/${targetSectionId}/pages`)
@@ -1339,20 +1349,7 @@ server.tool(
       `Attempting to create page with title: "${title}" in section: ${validatedSectionId}`
     );
 
-    const htmlContent = textToHtml(content);
-    const pageHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <title>${textToHtml(title)}</title>
-  <meta charset="utf-8">
-</head>
-<body>
-  <h1>${textToHtml(title)}</h1>
-  ${htmlContent}
-  <hr>
-  <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
-</body>
-</html>`;
+    const pageHtml = createPageHtml(title, content);
 
     const response = await graphClient
       .api(`/me/onenote/sections/${validatedSectionId}/pages`)
