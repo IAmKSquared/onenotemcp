@@ -3,14 +3,20 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { DeviceCodeCredential } from '@azure/identity';
-import { JSDOM } from 'jsdom';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { escapeODataString, textToHtml, validateId, Cache, extractTextSummary } from './utils.mjs';
+import {
+  escapeODataString,
+  textToHtml,
+  validateId,
+  Cache,
+  extractTextSummary,
+  extractReadableText,
+} from './utils.mjs';
 
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
@@ -205,62 +211,6 @@ async function cachedApiCall(cacheKey, apiCall, ttl) {
   apiCache.set(cacheKey, result, ttl);
 
   return result;
-}
-
-// ============================================================================
-// HTML CONTENT PROCESSING UTILITIES
-// ============================================================================
-
-/**
- * Extracts readable plain text from HTML content.
- * Removes scripts, styles, and formats headings, paragraphs, lists, and tables.
- * @param {string} html - The HTML content string.
- * @returns {string} The extracted readable text.
- */
-function extractReadableText(html) {
-  try {
-    if (!html) return '';
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
-
-    document.querySelectorAll('script, style').forEach((element) => element.remove());
-
-    let text = '';
-    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
-      const headingText = heading.textContent?.trim();
-      if (headingText) text += `\n${headingText}\n${'-'.repeat(headingText.length)}\n`;
-    });
-    document.querySelectorAll('p').forEach((paragraph) => {
-      const content = paragraph.textContent?.trim();
-      if (content) text += `${content}\n\n`;
-    });
-    document.querySelectorAll('ul, ol').forEach((list) => {
-      text += '\n';
-      list.querySelectorAll('li').forEach((item, index) => {
-        const content = item.textContent?.trim();
-        if (content) text += `${list.tagName === 'OL' ? index + 1 + '.' : '-'} ${content}\n`;
-      });
-      text += '\n';
-    });
-    document.querySelectorAll('table').forEach((table) => {
-      text += '\n📊 Table content:\n';
-      table.querySelectorAll('tr').forEach((row) => {
-        const cells = Array.from(row.querySelectorAll('td, th'))
-          .map((cell) => cell.textContent?.trim())
-          .join(' | ');
-        if (cells.trim()) text += `${cells}\n`;
-      });
-      text += '\n';
-    });
-
-    if (!text.trim() && document.body) {
-      text = document.body.textContent?.trim().replace(/\s+/g, ' ') || '';
-    }
-    return text.trim();
-  } catch (error) {
-    console.error(`Error extracting readable text: ${error.message}`);
-    return 'Error: Could not extract readable text from HTML content.';
-  }
 }
 
 // ============================================================================

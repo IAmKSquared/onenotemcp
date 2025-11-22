@@ -98,27 +98,56 @@ export function extractTextSummary(html, maxLength = 300) {
 }
 
 /**
- * Converts HTML content to readable plain text
- * @param {string} html - The HTML string to convert
- * @returns {string} Plain text content
+ * Extracts readable plain text from HTML content with formatted structure.
+ * Preserves headings, paragraphs, lists, and tables with visual formatting.
+ * Removes scripts and styles, formats headings with underlines, lists with bullets/numbers.
+ * @param {string} html - The HTML content string
+ * @returns {string} The extracted readable text with formatting
  */
-export function htmlToText(html) {
-  if (!html) return '';
+export function extractReadableText(html) {
+  try {
+    if (!html) return '';
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
 
-  const dom = new JSDOM(html);
-  const doc = dom.window.document;
+    document.querySelectorAll('script, style').forEach((element) => element.remove());
 
-  // Remove script and style elements
-  doc.querySelectorAll('script, style').forEach((el) => el.remove());
+    let text = '';
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+      const headingText = heading.textContent?.trim();
+      if (headingText) text += `\n${headingText}\n${'-'.repeat(headingText.length)}\n`;
+    });
+    document.querySelectorAll('p').forEach((paragraph) => {
+      const content = paragraph.textContent?.trim();
+      if (content) text += `${content}\n\n`;
+    });
+    document.querySelectorAll('ul, ol').forEach((list) => {
+      text += '\n';
+      list.querySelectorAll('li').forEach((item, index) => {
+        const content = item.textContent?.trim();
+        if (content) text += `${list.tagName === 'OL' ? index + 1 + '.' : '-'} ${content}\n`;
+      });
+      text += '\n';
+    });
+    document.querySelectorAll('table').forEach((table) => {
+      text += '\n📊 Table content:\n';
+      table.querySelectorAll('tr').forEach((row) => {
+        const cells = Array.from(row.querySelectorAll('td, th'))
+          .map((cell) => cell.textContent?.trim())
+          .join(' | ');
+        if (cells.trim()) text += `${cells}\n`;
+      });
+      text += '\n';
+    });
 
-  let text = doc.body.textContent || '';
-
-  // Clean up whitespace
-  text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Multiple blank lines to double
-  text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single
-  text = text.trim();
-
-  return text;
+    if (!text.trim() && document.body) {
+      text = document.body.textContent?.trim().replace(/\s+/g, ' ') || '';
+    }
+    return text.trim();
+  } catch (error) {
+    console.error(`Error extracting readable text: ${error.message}`);
+    return 'Error: Could not extract readable text from HTML content.';
+  }
 }
 
 /**

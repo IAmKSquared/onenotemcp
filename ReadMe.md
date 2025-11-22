@@ -314,7 +314,8 @@ npm run test:integration  # Integration test (calls actual MCP tools)
 ### Test Structure
 
 - **test_unit.mjs** - Unit tests for utility functions (escapeODataString,
-  sanitizeUrl, validateId, htmlToText, textToHtml, Cache class)
+  sanitizeUrl, validateId, extractReadableText, extractTextSummary, textToHtml,
+  Cache class)
 - **test_smoke.mjs** - Smoke test that verifies the MCP server starts and all 22
   tools are properly registered
 - **test_integration.mjs** - Integration tests that invoke tools and validate

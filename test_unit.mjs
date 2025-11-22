@@ -9,10 +9,10 @@ import {
   escapeODataString,
   sanitizeUrl,
   validateId,
-  htmlToText,
   extractTextSummary,
+  extractReadableText,
   textToHtml,
-  Cache
+  Cache,
 } from './utils.mjs';
 
 // ============================================================================
@@ -179,43 +179,6 @@ describe('validateId', () => {
 // Content Processing Tests
 // ============================================================================
 
-describe('htmlToText', () => {
-  test('should extract plain text from simple HTML', () => {
-    const html = '<p>Hello World</p>';
-    assert.strictEqual(htmlToText(html), 'Hello World');
-  });
-
-  test('should remove script tags', () => {
-    const html = '<p>Hello</p><script>alert(1)</script><p>World</p>';
-    const text = htmlToText(html);
-    assert.strictEqual(text.includes('alert'), false);
-    assert.strictEqual(text.includes('Hello'), true);
-  });
-
-  test('should remove style tags', () => {
-    const html = '<p>Hello</p><style>body{color:red}</style>';
-    const text = htmlToText(html);
-    assert.strictEqual(text.includes('color'), false);
-  });
-
-  test('should handle empty HTML', () => {
-    assert.strictEqual(htmlToText(''), '');
-    assert.strictEqual(htmlToText(null), '');
-  });
-
-  test('should normalize whitespace', () => {
-    const html = '<p>Hello    World</p>';
-    assert.strictEqual(htmlToText(html), 'Hello World');
-  });
-
-  test('should collapse multiple blank lines', () => {
-    const html = '<p>Line 1</p><br><br><br><p>Line 2</p>';
-    const text = htmlToText(html);
-    // Should not have more than double newlines
-    assert.strictEqual(text.includes('\n\n\n'), false);
-  });
-});
-
 describe('extractTextSummary', () => {
   test('should extract summary from HTML', () => {
     const html = '<p>This is a test paragraph with some content.</p>';
@@ -262,10 +225,101 @@ describe('extractTextSummary', () => {
   });
 
   test('should handle HTML with scripts and styles', () => {
-    const html = '<html><head><style>body{color:red}</style></head><body><p>Content</p><script>alert(1)</script></body></html>';
+    const html =
+      '<html><head><style>body{color:red}</style></head><body><p>Content</p><script>alert(1)</script></body></html>';
     const summary = extractTextSummary(html, 50);
     assert.strictEqual(summary.includes('alert'), true); // textContent includes script text
     assert.strictEqual(summary.includes('Content'), true);
+  });
+});
+
+describe('extractReadableText', () => {
+  test('should extract text from simple HTML', () => {
+    const html = '<p>Hello World</p>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('Hello World'), true);
+  });
+
+  test('should format headings with underlines', () => {
+    const html = '<h1>Title</h1><p>Content</p>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('Title'), true);
+    assert.strictEqual(text.includes('-----'), true); // Underline
+  });
+
+  test('should format unordered lists with bullets', () => {
+    const html = '<ul><li>Item 1</li><li>Item 2</li></ul>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('- Item 1'), true);
+    assert.strictEqual(text.includes('- Item 2'), true);
+  });
+
+  test('should format ordered lists with numbers', () => {
+    const html = '<ol><li>First</li><li>Second</li></ol>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('1. First'), true);
+    assert.strictEqual(text.includes('2. Second'), true);
+  });
+
+  test('should format tables with pipe separators', () => {
+    const html = '<table><tr><th>Header</th></tr><tr><td>Data</td></tr></table>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('📊 Table content:'), true);
+    assert.strictEqual(text.includes('Header'), true);
+    assert.strictEqual(text.includes('Data'), true);
+  });
+
+  test('should remove script and style tags', () => {
+    const html = '<p>Content</p><script>alert(1)</script><style>body{color:red}</style>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('alert'), false);
+    assert.strictEqual(text.includes('color'), false);
+    assert.strictEqual(text.includes('Content'), true);
+  });
+
+  test('should handle empty HTML', () => {
+    assert.strictEqual(extractReadableText(''), '');
+    assert.strictEqual(extractReadableText(null), '');
+  });
+
+  test('should handle complex HTML with multiple elements', () => {
+    const html = '<h1>Title</h1><p>Paragraph 1</p><ul><li>Item 1</li></ul><p>Paragraph 2</p>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('Title'), true);
+    assert.strictEqual(text.includes('Paragraph 1'), true);
+    assert.strictEqual(text.includes('- Item 1'), true);
+    assert.strictEqual(text.includes('Paragraph 2'), true);
+  });
+
+  test('should fallback to body text if no structured elements', () => {
+    const html = '<div>Plain text in div</div>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('Plain text in div'), true);
+  });
+
+  test('should handle nested lists', () => {
+    const html = '<ul><li>Parent<ul><li>Child</li></ul></li></ul>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('Parent'), true);
+    assert.strictEqual(text.includes('Child'), true);
+  });
+
+  test('should preserve paragraph spacing', () => {
+    const html = '<p>First paragraph</p><p>Second paragraph</p>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('First paragraph'), true);
+    assert.strictEqual(text.includes('Second paragraph'), true);
+  });
+
+  test('should handle all heading levels', () => {
+    const html = '<h1>H1</h1><h2>H2</h2><h3>H3</h3><h4>H4</h4><h5>H5</h5><h6>H6</h6>';
+    const text = extractReadableText(html);
+    assert.strictEqual(text.includes('H1'), true);
+    assert.strictEqual(text.includes('H2'), true);
+    assert.strictEqual(text.includes('H3'), true);
+    assert.strictEqual(text.includes('H4'), true);
+    assert.strictEqual(text.includes('H5'), true);
+    assert.strictEqual(text.includes('H6'), true);
   });
 });
 
@@ -390,7 +444,7 @@ describe('Cache', () => {
     assert.strictEqual(cache.get('key1'), 'value1');
 
     // Wait for expiration
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     assert.strictEqual(cache.get('key1'), undefined);
   });
