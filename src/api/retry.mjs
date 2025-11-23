@@ -110,6 +110,21 @@ export function getDetailedErrorMessage(error, errorPrefix) {
 
 /**
  * Creates a standardized tool handler with error handling and authentication checks.
+ *
+ * This wrapper provides:
+ * - Automatic authentication verification via ensureGraphClient()
+ * - Retry logic with exponential backoff for transient failures
+ * - Standardized error messages based on HTTP status codes
+ * - Consistent error response format for MCP
+ *
+ * NOTE: Authentication tools (authenticate, saveAccessToken) intentionally DO NOT
+ * use this wrapper because:
+ * 1. They bootstrap authentication and cannot call ensureGraphClient()
+ * 2. They handle interactive auth flows, not HTTP API calls
+ * 3. They require custom user instructions, not HTTP status-based error messages
+ * 4. Retry logic doesn't apply to user-driven authentication steps
+ *
+ * See auth-tools.mjs for detailed rationale.
  * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  * @param {Function} handler - The async tool implementation function.
  * @param {string} errorPrefix - The prefix for error messages.
@@ -118,11 +133,9 @@ export function getDetailedErrorMessage(error, errorPrefix) {
 export function createToolHandler(session, handler, errorPrefix = 'Tool execution failed') {
   return async (args) => {
     try {
-      // 'authenticate' tool is a special case that establishes the session,
-      // so we don't check for ensureGraphClient() inside it to avoid recursion/errors.
-      if (handler.name !== 'authenticateHandler') {
-        await session.ensureGraphClient();
-      }
+      // Ensure authentication before executing tool
+      // (Auth tools handle their own bootstrap and don't call this wrapper)
+      await session.ensureGraphClient();
 
       // Wrap handler with retry logic for transient failures
       return await retryWithBackoff(async () => {
