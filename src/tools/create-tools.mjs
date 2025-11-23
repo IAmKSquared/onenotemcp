@@ -7,6 +7,14 @@ import { logger } from '../utils/logger.mjs';
 
 /**
  * Registers creation-related tools with the MCP server.
+ *
+ * NOTE ON CACHE INVALIDATION:
+ * - createNotebook: Invalidates CacheKeys.notebooks() ✅
+ * - createSection: Invalidates CacheKeys.sections() ✅
+ * - createPage/createPageInSection: No cache to invalidate (pages not cached)
+ * - createSectionGroup: No cache to invalidate (section groups not cached)
+ *
+ * See src/api/cache.mjs for complete caching strategy documentation.
  * @param {McpServer} server - The MCP server instance.
  * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  */
@@ -133,7 +141,8 @@ export function registerCreateTools(server, session) {
 
         const response = await graphClient.api('/me/onenote/notebooks').post({ displayName });
 
-        // Invalidate notebook list cache
+        // Invalidate notebook list cache since we just created a new notebook
+        // See src/api/cache.mjs for full caching strategy documentation
         apiCache.invalidate(CacheKeys.notebooks());
 
         return {
@@ -182,6 +191,8 @@ export function registerCreateTools(server, session) {
           .post({ displayName });
 
         // Invalidate sections cache for this notebook and general sections list
+        // since we just created a new section
+        // See src/api/cache.mjs for full caching strategy documentation
         apiCache.invalidate(CacheKeys.sections(validatedNotebookId));
         apiCache.invalidate(CacheKeys.sections());
 

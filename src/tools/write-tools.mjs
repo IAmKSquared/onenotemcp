@@ -8,6 +8,12 @@ import { logger } from '../utils/logger.mjs';
 
 /**
  * Registers write/update-related tools with the MCP server.
+ *
+ * NOTE ON CACHE INVALIDATION:
+ * These operations modify page content but do NOT invalidate any caches because
+ * pages are intentionally not cached. Pages have dynamic content with frequent
+ * mutations, and caching them would risk serving stale data. See src/api/cache.mjs
+ * for the complete caching strategy documentation.
  * @param {McpServer} server - The MCP server instance.
  * @param {import('../session.mjs').OneNoteSession} session - The session instance.
  */

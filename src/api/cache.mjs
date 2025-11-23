@@ -5,6 +5,34 @@ import { logger } from '../utils/logger.mjs';
 export const apiCache = new Cache();
 
 /**
+ * Caching Strategy for OneNote MCP
+ * --------------------------------
+ * This module implements selective caching for Microsoft Graph API calls to
+ * optimize performance while maintaining data consistency.
+ *
+ * WHAT IS CACHED:
+ * - Notebooks list: Rarely changes, safe to cache
+ * - Sections list: Changes infrequently, benefits from caching
+ *
+ * WHAT IS NOT CACHED:
+ * - Pages: Dynamic content with frequent mutations (create, update, append, etc.)
+ *   Caching pages would risk serving stale content and require complex invalidation
+ *   logic across many mutation operations.
+ * - Section groups: Rarely used, not worth the complexity
+ * - Individual resources: Single-item fetches are fast enough without caching
+ * - Search results: Dynamic and query-specific, unsuitable for caching
+ *
+ * CACHE INVALIDATION:
+ * - createNotebook: Invalidates CacheKeys.notebooks()
+ * - createSection: Invalidates CacheKeys.sections() and CacheKeys.sections(notebookId)
+ * - Page operations: No cache to invalidate (intentional)
+ * - Section group operations: No cache to invalidate (intentional)
+ *
+ * This intentional design keeps the caching layer simple, predictable, and maintainable
+ * while providing performance benefits where they matter most (list operations).
+ */
+
+/**
  * Cache key builder for consistent cache key construction.
  * Provides centralized cache key generation to avoid manual string construction.
  */
