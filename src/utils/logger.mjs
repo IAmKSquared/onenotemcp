@@ -1,4 +1,5 @@
 import pino from 'pino';
+import pinoPretty from 'pino-pretty';
 
 /**
  * Centralized logging utility using Pino.
@@ -19,21 +20,21 @@ import pino from 'pino';
  *   logger.error({ err: error }, 'Authentication failed');
  */
 
-// Configure pino with human-readable output during development
-// In production, use JSON output for better parsing/analysis
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport:
-    process.env.NODE_ENV !== 'production'
-      ? {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'HH:MM:ss',
-            ignore: 'pid,hostname',
-          },
-        }
-      : undefined,
+// Configure pino to output to stderr for MCP compatibility
+// MCP servers must keep stdout clean for JSON-RPC protocol messages
+// Use pino-pretty stream that writes directly to stderr
+const prettyStream = pinoPretty({
+  colorize: true,
+  translateTime: 'HH:MM:ss',
+  ignore: 'pid,hostname',
+  destination: 2, // stderr file descriptor
 });
+
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || 'info',
+  },
+  process.env.NODE_ENV !== 'production' ? prettyStream : process.stderr
+);
 
 export { logger };
