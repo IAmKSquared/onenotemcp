@@ -10,7 +10,8 @@ import { DISPLAY_LIMITS } from '../config/constants.mjs';
 export function formatPageInfo(page, index = null) {
   const prefix = index !== null ? `${index + 1}. ` : '';
   const name = page.displayName || page.title || 'Untitled';
-  return `${prefix}**${name}** (ID: ${page.id})`;
+  const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
+  return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
 }
 
 /**

@@ -48,6 +48,7 @@ server.stdout.on('data', (data) => {
             'getRecentPages',
             'getPageContent',
             'getPageByTitle',
+            'getPageLink',
             // Creating Structure
             'createNotebook',
             'createSection',

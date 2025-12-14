@@ -182,7 +182,7 @@ export function registerReadTools(server, session) {
 
         const response = await graphClient
           .api(`/me/onenote/sections/${validatedSectionId}/pages`)
-          .select('id,title,lastModifiedDateTime')
+          .select('id,title,lastModifiedDateTime,links')
           .top(50)
           .get();
 
@@ -266,7 +266,7 @@ export function registerReadTools(server, session) {
           const sectionPagePromises = sections.map(async (section) => {
             let sectionRequest = graphClient
               .api(`/me/onenote/sections/${section.id}/pages`)
-              .select('id,title,lastModifiedDateTime')
+              .select('id,title,lastModifiedDateTime,links')
               .top(50);
 
             if (filterConditions.length > 0) {
@@ -300,7 +300,7 @@ export function registerReadTools(server, session) {
 
         let request = graphClient
           .api('/me/onenote/pages')
-          .select('id,title,lastModifiedDateTime')
+          .select('id,title,lastModifiedDateTime,links')
           .top(50);
 
         if (filterConditions.length > 0) {
@@ -377,7 +377,7 @@ export function registerReadTools(server, session) {
         const sectionPagePromises = sections.map(async (section) => {
           const sectionPages = await graphClient
             .api(`/me/onenote/sections/${section.id}/pages`)
-            .select('id,title,lastModifiedDateTime')
+            .select('id,title,lastModifiedDateTime,links')
             .orderby('lastModifiedDateTime desc')
             .top(limit)
             .get();
@@ -467,7 +467,7 @@ export function registerReadTools(server, session) {
         const pagesResponse = await graphClient
           .api('/me/onenote/pages')
           .filter(`contains(tolower(title), '${escapedTitle}')`)
-          .select('id,title,lastModifiedDateTime')
+          .select('id,title,lastModifiedDateTime,links')
           .top(50)
           .get();
 
@@ -515,6 +515,38 @@ export function registerReadTools(server, session) {
         return { content: [{ type: 'text', text: resultText }] };
       },
       'Failed to get page by title'
+    )
+  );
+
+  server.tool(
+    'getPageLink',
+    {
+      pageId: z.string().describe('The ID of the page to get links for.'),
+    },
+    createToolHandler(
+      session,
+      async ({ pageId }) => {
+        const graphClient = session.getGraphClient();
+        const validatedPageId = validateId(pageId, 'page');
+
+        const response = await graphClient
+          .api(`/me/onenote/pages/${validatedPageId}`)
+          .select('id,title,links')
+          .get();
+
+        const webUrl = response.links?.oneNoteWebUrl || 'Not available';
+        const clientUrl = response.links?.oneNoteClientUrl || 'Not available';
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `📄 **${response.title}**\n\n🌐 **Web URL (open in browser):**\n${webUrl}\n\n💻 **Desktop App URL:**\n${clientUrl}`,
+            },
+          ],
+        };
+      },
+      'Failed to get page link'
     )
   );
 }

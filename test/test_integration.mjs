@@ -626,7 +626,8 @@ describe('formatPageInfo', () => {
   function formatPageInfo(page, index = null) {
     const prefix = index !== null ? `${index + 1}. ` : '';
     const name = page.displayName || page.title || 'Untitled';
-    return `${prefix}**${name}** (ID: ${page.id})`;
+    const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
+    return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
   }
 
   test('should format page with title', () => {
@@ -677,6 +678,42 @@ describe('formatPageInfo', () => {
 
     assert.strictEqual(result, '3. **Third Page** (ID: page456)');
   });
+
+  test('should include web link when available', () => {
+    const page = {
+      id: 'page123',
+      title: 'My Page',
+      links: { oneNoteWebUrl: 'https://onenote.com/page123' },
+    };
+    const result = formatPageInfo(page);
+
+    assert.strictEqual(result, '**My Page** (ID: page123) - [Open](https://onenote.com/page123)');
+  });
+
+  test('should include web link with index', () => {
+    const page = {
+      id: 'page456',
+      title: 'Linked Page',
+      links: { oneNoteWebUrl: 'https://onenote.com/page456' },
+    };
+    const result = formatPageInfo(page, 1);
+
+    assert.strictEqual(
+      result,
+      '2. **Linked Page** (ID: page456) - [Open](https://onenote.com/page456)'
+    );
+  });
+
+  test('should not include link when links object exists but no web URL', () => {
+    const page = {
+      id: 'page123',
+      title: 'My Page',
+      links: { oneNoteClientUrl: 'onenote://page123' },
+    };
+    const result = formatPageInfo(page);
+
+    assert.strictEqual(result, '**My Page** (ID: page123)');
+  });
 });
 
 describe('formatItemList', () => {
@@ -698,7 +735,8 @@ describe('formatItemList', () => {
     function formatPageInfo(page, index = null) {
       const prefix = index !== null ? `${index + 1}. ` : '';
       const name = page.displayName || page.title || 'Untitled';
-      return `${prefix}**${name}** (ID: ${page.id})`;
+      const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
+      return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
     }
 
     const displayItems = items.slice(0, maxDisplay);

@@ -125,7 +125,7 @@ onenote-mcp-server/
 - **Session management:** Encapsulated state via `OneNoteSession` class (no
   global variables)
 - **Centralized configuration:** All magic numbers replaced with named constants
-- **Comprehensive testing:** 146 tests covering security, functionality, and
+- **Comprehensive testing:** 149 tests covering security, functionality, and
   integration
 
 ## Configuration
@@ -309,6 +309,8 @@ This server exposes the following tools to your AI assistant:
 - `getPageByTitle`: Finds a page by its title and retrieves its content. (Args:
   `title` (string), `format` (enum: "text", "html", "summary", optional,
   default: "text"))
+- `getPageLink`: Gets direct links to open a page in browser or desktop app.
+  (Arg: `pageId` (string))
 
 **Creating & Managing Structure:**
 
@@ -395,7 +397,7 @@ npm test
 ```bash
 npm run test:unit         # Unit tests (96 tests for utility functions)
 npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
-npm run test:integration  # Integration tests (50 tests for core functionality)
+npm run test:integration  # Integration tests (53 tests for core functionality)
 ```
 
 ### Test Structure
@@ -404,8 +406,8 @@ npm run test:integration  # Integration tests (50 tests for core functionality)
   (escapeODataString, sanitizeUrl, validateId, extractReadableText,
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
-  all 23 tools are properly registered
-- **test/test_integration.mjs** - Integration tests (50 tests) that validate
+  all 24 tools are properly registered
+- **test/test_integration.mjs** - Integration tests (53 tests) that validate
   encryption, retry logic, error handling, and formatting functions
 
 ### Test Coverage
