@@ -335,6 +335,86 @@ export function registerReadTools(server, session) {
   );
 
   server.tool(
+    'getRecentPages',
+    {
+      notebookId: z.string().describe('The notebook ID to get recent pages from.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .default(10)
+        .describe('Number of pages to return (default: 10, max: 50).')
+        .optional(),
+    },
+    createToolHandler(
+      session,
+      async ({ notebookId, limit = 10 }) => {
+        const graphClient = session.getGraphClient();
+        const validatedNotebookId = validateId(notebookId, 'notebook');
+
+        // Get notebook info for display name
+        const notebookResponse = await graphClient
+          .api(`/me/onenote/notebooks/${validatedNotebookId}`)
+          .select('displayName')
+          .get();
+        const notebookName = notebookResponse.displayName;
+
+        const sectionsResponse = await graphClient
+          .api(`/me/onenote/notebooks/${validatedNotebookId}/sections`)
+          .get();
+        const sections = sectionsResponse.value || [];
+
+        if (sections.length === 0) {
+          return {
+            content: [
+              { type: 'text', text: `📄 No sections found in notebook "${notebookName}".` },
+            ],
+          };
+        }
+
+        // Fetch recent pages from each section in parallel (orderby ensures we get the most recent)
+        const sectionPagePromises = sections.map(async (section) => {
+          const sectionPages = await graphClient
+            .api(`/me/onenote/sections/${section.id}/pages`)
+            .select('id,title,lastModifiedDateTime')
+            .orderby('lastModifiedDateTime desc')
+            .top(limit)
+            .get();
+          return sectionPages.value || [];
+        });
+
+        const sectionResults = await Promise.all(sectionPagePromises);
+        const allPages = sectionResults.flat();
+
+        // Sort merged results by lastModifiedDateTime descending
+        allPages.sort(
+          (a, b) => new Date(b.lastModifiedDateTime) - new Date(a.lastModifiedDateTime)
+        );
+
+        const pages = allPages.slice(0, limit);
+
+        if (pages.length > 0) {
+          const { list, more, limitWarning } = formatItemList(pages, 'pages', limit, 50);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `📄 **Recent Pages in "${notebookName}"** (${pages.length} found):\n\n${list}${more}${limitWarning}`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [{ type: 'text', text: `📄 No pages found in notebook "${notebookName}".` }],
+          };
+        }
+      },
+      'Failed to get recent pages'
+    )
+  );
+
+  server.tool(
     'getPageContent',
     {
       pageId: z.string().describe('The ID of the page to retrieve content from.'),

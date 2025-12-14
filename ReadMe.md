@@ -301,6 +301,8 @@ This server exposes the following tools to your AI assistant:
   filtering. (Args: `query` (optional string), `modifiedAfter` (optional ISO
   8601 date), `modifiedBefore` (optional ISO 8601 date), `notebookId` (optional
   string))
+- `getRecentPages`: Retrieves recently modified pages within a notebook. (Args:
+  `notebookId` (string), `limit` (optional number, default: 10, max: 50))
 - `getPageContent`: Retrieves the content of a specific OneNote page. (Args:
   `pageId` (string), `format` (enum: "text", "html", "summary", optional,
   default: "text"))
@@ -402,7 +404,7 @@ npm run test:integration  # Integration tests (50 tests for core functionality)
   (escapeODataString, sanitizeUrl, validateId, extractReadableText,
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
-  all 22 tools are properly registered
+  all 23 tools are properly registered
 - **test/test_integration.mjs** - Integration tests (50 tests) that validate
   encryption, retry logic, error handling, and formatting functions
 

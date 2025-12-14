@@ -45,6 +45,7 @@ server.stdout.on('data', (data) => {
             'searchSections',
             'listPagesInSection',
             'searchPages',
+            'getRecentPages',
             'getPageContent',
             'getPageByTitle',
             // Creating Structure
