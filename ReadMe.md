@@ -3,10 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 The OneNote MCP Server is a powerful Model Context Protocol (MCP) server that
-enables AI language models (LLMs) like Claude, and other AI assistants, to
-securely interact with your Microsoft OneNote data. It allows for reading,
-writing, searching, and comprehensive editing of your OneNote notebooks,
-sections, and pages directly through your AI interface.
+enables AI AI assistants to securely interact with your Microsoft OneNote data.
+It allows for reading, writing, searching, and comprehensive editing of your
+OneNote notebooks, sections, and pages directly through your AI interface.
 
 This server provides a rich set of tools for advanced OneNote management,
 including robust text extraction, HTML content processing, and fine-grained page
@@ -60,8 +59,7 @@ manipulation.
 - **Node.js:** Version 18.x or later is recommended. (Install from
   [nodejs.org](https://nodejs.org/))
 - **npm:** Usually comes bundled with Node.js.
-- **Git:** For cloning the repository. (Install from
-  [git-scm.com](https://git-scm.com/))
+- **Git**
 - **Microsoft Account:** An active Microsoft account with access to OneNote.
 - **Azure Application Registration (Recommended for Production/Shared Use):**
   - While the server defaults to using the Microsoft Graph Explorer's public
@@ -76,12 +74,9 @@ manipulation.
 1.  **Clone the Repository:**
 
     ```bash
-    git clone https://github.com/[your-github-username]/onenote-ultimate-mcp-server.git
-    cd onenote-ultimate-mcp-server
+    git clone https://github.com/IAmKSquared/onenotemcp.git
+    cd onenotemcp
     ```
-
-    _(Replace `[your-github-username]/onenote-ultimate-mcp-server` with your
-    actual repository URL)_
 
 2.  **Install Dependencies:**
     ```bash
@@ -118,7 +113,7 @@ onenote-mcp-server/
 │   ├── session.mjs         # Session state management
 │   └── server.mjs          # Main entry point
 ├── test/                   # Test suite
-│   ├── test_unit.mjs              # 94 unit tests
+│   ├── test_unit.mjs              # 96 unit tests
 │   ├── test_smoke.mjs             # Server startup verification
 │   └── test_integration.mjs       # 50 integration tests
 └── package.json
@@ -130,7 +125,7 @@ onenote-mcp-server/
 - **Session management:** Encapsulated state via `OneNoteSession` class (no
   global variables)
 - **Centralized configuration:** All magic numbers replaced with named constants
-- **Comprehensive testing:** 144 tests covering security, functionality, and
+- **Comprehensive testing:** 146 tests covering security, functionality, and
   integration
 
 ## Configuration
@@ -201,8 +196,8 @@ available tool categories.
 
 ## Connecting to an MCP Client
 
-You can connect this server to any MCP-compatible client, such as Claude Desktop
-or Cursor.
+You can connect this server to any MCP-compatible client, such as Claude
+Desktop.
 
 **Example for Claude Desktop or Cursor:**
 
@@ -222,9 +217,7 @@ or Cursor.
       "mcpServers": {
         "onenote": {
           "command": "node",
-          "args": [
-            "/full/path/to/your/onenote-ultimate-mcp-server/src/server.mjs"
-          ]
+          "args": ["/full/path/to/your/onenotemcp/src/server.mjs"]
         }
       }
     }
@@ -237,9 +230,7 @@ or Cursor.
       "mcpServers": {
         "onenote": {
           "command": "node",
-          "args": [
-            "/full/path/to/your/onenote-ultimate-mcp-server/src/server.mjs"
-          ],
+          "args": ["/full/path/to/your/onenotemcp/src/server.mjs"],
           "env": {
             "AZURE_CLIENT_ID": "YOUR_AZURE_APP_CLIENT_ID_HERE"
           }
@@ -248,8 +239,8 @@ or Cursor.
     }
     ```
 
-    - Replace `/full/path/to/your/onenote-ultimate-mcp-server/` with the
-      **absolute path** to where you cloned the repository.
+    - Replace `/full/path/to/your/onenotemcp/` with the **absolute path** to
+      where you cloned the repository.
     - Note: The path should point to `src/server.mjs` in the project directory.
     - The `env` section is **optional** and only needed if:
       - You want to use a custom Azure App client ID, AND
@@ -400,14 +391,14 @@ npm test
 **Run specific test types:**
 
 ```bash
-npm run test:unit         # Unit tests (94 tests for utility functions)
+npm run test:unit         # Unit tests (96 tests for utility functions)
 npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
 npm run test:integration  # Integration tests (50 tests for core functionality)
 ```
 
 ### Test Structure
 
-- **test/test_unit.mjs** - Unit tests (94 tests) for utility functions
+- **test/test_unit.mjs** - Unit tests (96 tests) for utility functions
   (escapeODataString, sanitizeUrl, validateId, extractReadableText,
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
