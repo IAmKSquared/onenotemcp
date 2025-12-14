@@ -509,10 +509,12 @@ manual intervention.
 - **Permissions:** This server requests `Notes.ReadWrite` and `Notes.Create`
   permissions. Be aware of the access you are granting.
 
-## Fork Information
+## Acknowledgments
 
-This is a fork of [onenotemcp](https://github.com/eshlon/onenotemcp) by Ehsan
-Shahabi.
+This project was originally derived from
+[onenotemcp](https://github.com/eshlon/onenotemcp) by Ehsan Shahabi, but has
+since been substantially rewritten and expanded with new architecture, features,
+and tooling.
 
 ## License
 
