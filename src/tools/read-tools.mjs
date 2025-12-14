@@ -534,8 +534,13 @@ export function registerReadTools(server, session) {
           .select('id,title,links')
           .get();
 
-        const webUrl = response.links?.oneNoteWebUrl || 'Not available';
-        const clientUrl = response.links?.oneNoteClientUrl || 'Not available';
+        // Graph API returns links as objects with href property
+        const webUrl =
+          response.links?.oneNoteWebUrl?.href || response.links?.oneNoteWebUrl || 'Not available';
+        const clientUrl =
+          response.links?.oneNoteClientUrl?.href ||
+          response.links?.oneNoteClientUrl ||
+          'Not available';
 
         return {
           content: [

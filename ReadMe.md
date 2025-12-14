@@ -125,7 +125,7 @@ onenote-mcp-server/
 - **Session management:** Encapsulated state via `OneNoteSession` class (no
   global variables)
 - **Centralized configuration:** All magic numbers replaced with named constants
-- **Comprehensive testing:** 149 tests covering security, functionality, and
+- **Comprehensive testing:** 151 tests covering security, functionality, and
   integration
 
 ## Configuration
@@ -397,7 +397,7 @@ npm test
 ```bash
 npm run test:unit         # Unit tests (96 tests for utility functions)
 npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
-npm run test:integration  # Integration tests (53 tests for core functionality)
+npm run test:integration  # Integration tests (55 tests for core functionality)
 ```
 
 ### Test Structure
@@ -407,7 +407,7 @@ npm run test:integration  # Integration tests (53 tests for core functionality)
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
   all 24 tools are properly registered
-- **test/test_integration.mjs** - Integration tests (53 tests) that validate
+- **test/test_integration.mjs** - Integration tests (55 tests) that validate
   encryption, retry logic, error handling, and formatting functions
 
 ### Test Coverage

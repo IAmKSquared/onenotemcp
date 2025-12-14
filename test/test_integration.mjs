@@ -626,8 +626,14 @@ describe('formatPageInfo', () => {
   function formatPageInfo(page, index = null) {
     const prefix = index !== null ? `${index + 1}. ` : '';
     const name = page.displayName || page.title || 'Untitled';
-    const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
-    return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
+    // Graph API returns links as objects with href property
+    const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
+    const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
+    const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
+    const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
+    const links = [webLink, appLink].filter(Boolean).join(' | ');
+    const linksSuffix = links ? ` - ${links}` : '';
+    return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
   }
 
   test('should format page with title', () => {
@@ -679,7 +685,46 @@ describe('formatPageInfo', () => {
     assert.strictEqual(result, '3. **Third Page** (ID: page456)');
   });
 
-  test('should include web link when available', () => {
+  test('should include web link from href object', () => {
+    const page = {
+      id: 'page123',
+      title: 'My Page',
+      links: { oneNoteWebUrl: { href: 'https://onenote.com/page123' } },
+    };
+    const result = formatPageInfo(page);
+
+    assert.strictEqual(result, '**My Page** (ID: page123) - [Web](https://onenote.com/page123)');
+  });
+
+  test('should include app link from href object', () => {
+    const page = {
+      id: 'page123',
+      title: 'My Page',
+      links: { oneNoteClientUrl: { href: 'onenote://page123' } },
+    };
+    const result = formatPageInfo(page);
+
+    assert.strictEqual(result, '**My Page** (ID: page123) - [App](onenote://page123)');
+  });
+
+  test('should include both web and app links from href objects', () => {
+    const page = {
+      id: 'page456',
+      title: 'Linked Page',
+      links: {
+        oneNoteWebUrl: { href: 'https://onenote.com/page456' },
+        oneNoteClientUrl: { href: 'onenote://page456' },
+      },
+    };
+    const result = formatPageInfo(page, 1);
+
+    assert.strictEqual(
+      result,
+      '2. **Linked Page** (ID: page456) - [Web](https://onenote.com/page456) | [App](onenote://page456)'
+    );
+  });
+
+  test('should handle direct string URLs as fallback', () => {
     const page = {
       id: 'page123',
       title: 'My Page',
@@ -687,28 +732,14 @@ describe('formatPageInfo', () => {
     };
     const result = formatPageInfo(page);
 
-    assert.strictEqual(result, '**My Page** (ID: page123) - [Open](https://onenote.com/page123)');
+    assert.strictEqual(result, '**My Page** (ID: page123) - [Web](https://onenote.com/page123)');
   });
 
-  test('should include web link with index', () => {
-    const page = {
-      id: 'page456',
-      title: 'Linked Page',
-      links: { oneNoteWebUrl: 'https://onenote.com/page456' },
-    };
-    const result = formatPageInfo(page, 1);
-
-    assert.strictEqual(
-      result,
-      '2. **Linked Page** (ID: page456) - [Open](https://onenote.com/page456)'
-    );
-  });
-
-  test('should not include link when links object exists but no web URL', () => {
+  test('should not include links when links object is empty', () => {
     const page = {
       id: 'page123',
       title: 'My Page',
-      links: { oneNoteClientUrl: 'onenote://page123' },
+      links: {},
     };
     const result = formatPageInfo(page);
 
@@ -735,8 +766,14 @@ describe('formatItemList', () => {
     function formatPageInfo(page, index = null) {
       const prefix = index !== null ? `${index + 1}. ` : '';
       const name = page.displayName || page.title || 'Untitled';
-      const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
-      return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
+      // Graph API returns links as objects with href property
+      const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
+      const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
+      const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
+      const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
+      const links = [webLink, appLink].filter(Boolean).join(' | ');
+      const linksSuffix = links ? ` - ${links}` : '';
+      return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
     }
 
     const displayItems = items.slice(0, maxDisplay);

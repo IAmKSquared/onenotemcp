@@ -10,8 +10,14 @@ import { DISPLAY_LIMITS } from '../config/constants.mjs';
 export function formatPageInfo(page, index = null) {
   const prefix = index !== null ? `${index + 1}. ` : '';
   const name = page.displayName || page.title || 'Untitled';
-  const webLink = page.links?.oneNoteWebUrl ? ` - [Open](${page.links.oneNoteWebUrl})` : '';
-  return `${prefix}**${name}** (ID: ${page.id})${webLink}`;
+  // Graph API returns links as objects with href property
+  const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
+  const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
+  const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
+  const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
+  const links = [webLink, appLink].filter(Boolean).join(' | ');
+  const linksSuffix = links ? ` - ${links}` : '';
+  return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
 }
 
 /**
