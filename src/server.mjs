@@ -7,6 +7,7 @@ import { registerAuthTools } from './tools/auth-tools.mjs';
 import { registerReadTools } from './tools/read-tools.mjs';
 import { registerWriteTools } from './tools/write-tools.mjs';
 import { registerCreateTools } from './tools/create-tools.mjs';
+import { registerDeleteTools } from './tools/delete-tools.mjs';
 import { logger } from './utils/logger.mjs';
 
 // --- MCP Server Initialization ---
@@ -24,6 +25,7 @@ registerAuthTools(server, session);
 registerReadTools(server, session);
 registerWriteTools(server, session);
 registerCreateTools(server, session);
+registerDeleteTools(server, session);
 
 /**
  * Main function to initialize and start the MCP server.
@@ -54,6 +56,7 @@ async function main() {
       '   ➕ Create: createPage, createPageInSection, createNotebook, createSection, createSectionGroup'
     );
     logger.info('   📋 Manage: copyPage');
+    logger.info('   🗑️ Delete: deletePage');
     logger.info('---------------------------------');
 
     process.on('SIGINT', () => {

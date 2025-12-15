@@ -64,6 +64,8 @@ server.stdout.on('data', (data) => {
             'addTableToPage',
             // Page Management
             'copyPage',
+            // Delete
+            'deletePage',
           ];
 
           const missing = expectedTools.filter((tool) => !toolNames.includes(tool));

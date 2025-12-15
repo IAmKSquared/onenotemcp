@@ -352,6 +352,11 @@ This server exposes the following tools to your AI assistant:
 - `copyPage`: Copies a page to a different section (asynchronous operation).
   (Args: `pageId` (string), `targetSectionId` (string))
 
+**Deleting Resources:**
+
+- `deletePage`: Permanently deletes a page. (Args: `pageId` (string),
+  `confirmDelete` (boolean, must be true))
+
 ## Example Interactions with AI
 
 Once connected and authenticated, you can ask your AI assistant to perform tasks
@@ -406,7 +411,7 @@ npm run test:integration  # Integration tests (55 tests for core functionality)
   (escapeODataString, sanitizeUrl, validateId, extractReadableText,
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
-  all 24 tools are properly registered
+  all 25 tools are properly registered
 - **test/test_integration.mjs** - Integration tests (55 tests) that validate
   encryption, retry logic, error handling, and formatting functions
 
@@ -503,6 +508,50 @@ manual intervention.
   flow, a client secret is not used by this script.
 - **Permissions:** This server requests `Notes.ReadWrite` and `Notes.Create`
   permissions. Be aware of the access you are granting.
+
+## Known Limitations
+
+The following operations are **not supported** due to Microsoft Graph API
+limitations:
+
+### Renaming Sections or Section Groups
+
+The Microsoft Graph API does not support modifying section or section group
+properties after creation. Attempting to use PATCH operations on these resources
+returns a "Resource Not Found" error.
+
+**Workaround:** Create a new section with the desired name and manually copy
+pages to it using the OneNote application.
+
+### Moving Pages Between Sections
+
+The Microsoft Graph API only provides a `copyToSection` endpoint—there is no
+`moveToSection` operation. While we could theoretically copy a page and then
+delete the original, this is unsafe because:
+
+1. **Async operation:** The copy operation is asynchronous with no completion
+   callback
+2. **Data loss risk:** If the original is deleted before the copy completes, or
+   if the copy fails, the page is permanently lost
+3. **No atomicity:** There's no way to ensure both operations succeed together
+
+**Workaround:** Use `copyPage` to copy the page to the target section, manually
+verify the copy succeeded, then delete the original page using `deletePage`.
+
+### Deleting Sections, Section Groups, and Notebooks
+
+The Microsoft Graph API only supports deleting **pages**. There are no DELETE
+endpoints for sections, section groups, or notebooks.
+
+**Workaround:** Use the OneNote desktop or web application to delete sections,
+section groups, or notebooks.
+
+### Why These Limitations Exist
+
+These limitations are imposed by Microsoft's OneNote API design, not by this MCP
+server. The OneNote API prioritizes data safety over convenience for destructive
+operations. For the latest API capabilities, see the
+[Microsoft Graph OneNote API documentation](https://learn.microsoft.com/en-us/graph/api/resources/onenote-api-overview).
 
 ## Acknowledgments
 
