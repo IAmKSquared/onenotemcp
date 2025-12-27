@@ -3,8 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 The OneNote MCP Server is a powerful Model Context Protocol (MCP) server that
-enables AI AI assistants to securely interact with your Microsoft OneNote data.
-It allows for reading, writing, searching, and comprehensive editing of your
+enables AI assistants to securely interact with your Microsoft OneNote data. It
+allows for reading, writing, searching, and comprehensive editing of your
 OneNote notebooks, sections, and pages directly through your AI interface.
 
 This server provides a rich set of tools for advanced OneNote management,
@@ -93,7 +93,7 @@ onenote-mcp-server/
 │   ├── auth/               # Authentication modules
 │   │   ├── device-code-flow.mjs    # OAuth device code flow
 │   │   ├── token-manager.mjs       # Token file operations
-│   │   ├── encryption.mjs          # AES-256-CBC encryption
+│   │   ├── encryption.mjs          # AES-256-GCM authenticated encryption
 │   │   └── key-storage.mjs         # OS keychain integration
 │   ├── api/                # API infrastructure
 │   │   ├── cache.mjs              # Caching layer with TTL
@@ -500,9 +500,9 @@ manual intervention.
     keychain on first startup.
 - **Access Token Security:** The `.access-token.txt` file contains an encrypted
   token that grants access to your OneNote data according to the defined scopes.
-  The token is encrypted using AES-256-CBC with a key stored securely in your OS
-  keychain. Protect this file as you would any sensitive credential. Ensure it
-  is included in your `.gitignore` file.
+  The token is encrypted using AES-256-GCM (authenticated encryption) with a key
+  stored securely in your OS keychain. Protect this file as you would any
+  sensitive credential. Ensure it is included in your `.gitignore` file.
 - **Azure Client ID:** If you create your own Azure App Registration, keep its
   client secret (if any generated for other flows) secure. For this device code
   flow, a client secret is not used by this script.
