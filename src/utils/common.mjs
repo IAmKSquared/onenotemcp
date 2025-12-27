@@ -24,7 +24,8 @@ export function escapeODataString(str) {
  */
 export function sanitizeUrl(url) {
   if (!url) return '#';
-  const safeProtocols = /^(https?:\/\/|mailto:)/i;
+  // Allow standard web protocols plus onenote: for OneNote app deep links
+  const safeProtocols = /^(https?:\/\/|mailto:|onenote:)/i;
   const hasProtocol = /^[a-z][a-z0-9+.-]*:/i.test(url.trim());
   if (hasProtocol && !safeProtocols.test(url.trim())) {
     return '#';

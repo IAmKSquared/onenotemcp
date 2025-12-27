@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { formatItemInfo, formatItemList } from '../src/utils/html.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -616,71 +617,52 @@ describe('getDetailedErrorMessage', () => {
 // Helper Functions Tests
 // ============================================================================
 
-describe('formatPageInfo', () => {
-  /**
-   * Format page information for display
-   * @param {object} page - The page object
-   * @param {number|null} index - Optional index for numbering
-   * @returns {string} Formatted page information
-   */
-  function formatPageInfo(page, index = null) {
-    const prefix = index !== null ? `${index + 1}. ` : '';
-    const name = page.displayName || page.title || 'Untitled';
-    // Graph API returns links as objects with href property
-    const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
-    const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
-    const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
-    const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
-    const links = [webLink, appLink].filter(Boolean).join(' | ');
-    const linksSuffix = links ? ` - ${links}` : '';
-    return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
-  }
-
+describe('formatItemInfo', () => {
   test('should format page with title', () => {
     const page = { id: 'page123', title: 'My Page' };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Page** (ID: page123)');
   });
 
   test('should format page with displayName', () => {
     const page = { id: 'page123', displayName: 'My Section' };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Section** (ID: page123)');
   });
 
   test('should prefer displayName over title', () => {
     const page = { id: 'page123', displayName: 'Display', title: 'Title' };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**Display** (ID: page123)');
   });
 
   test('should use "Untitled" for missing name', () => {
     const page = { id: 'page123' };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**Untitled** (ID: page123)');
   });
 
   test('should format with index', () => {
     const page = { id: 'page123', title: 'My Page' };
-    const result = formatPageInfo(page, 0);
+    const result = formatItemInfo(page, 0);
 
     assert.strictEqual(result, '1. **My Page** (ID: page123)');
   });
 
   test('should format with zero index', () => {
     const page = { id: 'page123', title: 'First Page' };
-    const result = formatPageInfo(page, 0);
+    const result = formatItemInfo(page, 0);
 
     assert.strictEqual(result, '1. **First Page** (ID: page123)');
   });
 
   test('should format with non-zero index', () => {
     const page = { id: 'page456', title: 'Third Page' };
-    const result = formatPageInfo(page, 2);
+    const result = formatItemInfo(page, 2);
 
     assert.strictEqual(result, '3. **Third Page** (ID: page456)');
   });
@@ -691,7 +673,7 @@ describe('formatPageInfo', () => {
       title: 'My Page',
       links: { oneNoteWebUrl: { href: 'https://onenote.com/page123' } },
     };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Page** (ID: page123) - [Web](https://onenote.com/page123)');
   });
@@ -702,7 +684,7 @@ describe('formatPageInfo', () => {
       title: 'My Page',
       links: { oneNoteClientUrl: { href: 'onenote://page123' } },
     };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Page** (ID: page123) - [App](onenote://page123)');
   });
@@ -716,7 +698,7 @@ describe('formatPageInfo', () => {
         oneNoteClientUrl: { href: 'onenote://page456' },
       },
     };
-    const result = formatPageInfo(page, 1);
+    const result = formatItemInfo(page, 1);
 
     assert.strictEqual(
       result,
@@ -730,7 +712,7 @@ describe('formatPageInfo', () => {
       title: 'My Page',
       links: { oneNoteWebUrl: 'https://onenote.com/page123' },
     };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Page** (ID: page123) - [Web](https://onenote.com/page123)');
   });
@@ -741,52 +723,13 @@ describe('formatPageInfo', () => {
       title: 'My Page',
       links: {},
     };
-    const result = formatPageInfo(page);
+    const result = formatItemInfo(page);
 
     assert.strictEqual(result, '**My Page** (ID: page123)');
   });
 });
 
 describe('formatItemList', () => {
-  /**
-   * Format a list of items with pagination info
-   * @param {Array} items - The items to format
-   * @param {string} itemType - The type of items (for messages)
-   * @param {number} maxDisplay - Maximum items to display
-   * @param {number} apiLimit - API result limit
-   * @returns {{list: string, more: string, limitWarning: string}} Formatted item list
-   */
-  function formatItemList(items, itemType = 'items', maxDisplay = 10, apiLimit = 50) {
-    /**
-     * Format page information for display
-     * @param {object} page - The page object
-     * @param {number|null} index - Optional index for numbering
-     * @returns {string} Formatted page information
-     */
-    function formatPageInfo(page, index = null) {
-      const prefix = index !== null ? `${index + 1}. ` : '';
-      const name = page.displayName || page.title || 'Untitled';
-      // Graph API returns links as objects with href property
-      const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
-      const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
-      const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
-      const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
-      const links = [webLink, appLink].filter(Boolean).join(' | ');
-      const linksSuffix = links ? ` - ${links}` : '';
-      return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
-    }
-
-    const displayItems = items.slice(0, maxDisplay);
-    const list = displayItems.map((item, i) => formatPageInfo(item, i)).join('\n\n');
-    const more =
-      items.length > maxDisplay ? `\n\n... and ${items.length - maxDisplay} more ${itemType}.` : '';
-    const limitWarning =
-      items.length === apiLimit
-        ? `\n\n� Note: Reached the ${apiLimit}-result limit. There may be additional matches not shown.`
-        : '';
-    return { list, more, limitWarning };
-  }
-
   test('should format items within maxDisplay', () => {
     const items = [
       { id: 'id1', title: 'Item 1' },

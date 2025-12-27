@@ -15,6 +15,12 @@ import {
   Cache,
   validateCsvData,
 } from '../src/utils/common.mjs';
+import {
+  formatTimestamp,
+  formatModifiedBy,
+  formatMetadata,
+  formatItemInfo,
+} from '../src/utils/html.mjs';
 
 // ============================================================================
 // Security Functions Tests
@@ -60,6 +66,10 @@ describe('sanitizeUrl', () => {
 
   test('should allow mailto URLs', () => {
     assert.strictEqual(sanitizeUrl('mailto:test@example.com'), 'mailto:test@example.com');
+  });
+
+  test('should allow onenote: URLs for app deep links', () => {
+    assert.strictEqual(sanitizeUrl('onenote://example.com/app'), 'onenote://example.com/app');
   });
 
   test('should block javascript: protocol', () => {
@@ -656,6 +666,245 @@ describe('validateCsvData', () => {
     assert.strictEqual(result[2][0], "'@handle");
     assert.strictEqual(result[2][1], 'normal');
     assert.strictEqual(result[2][2], "'=ANOTHER()");
+  });
+});
+
+// ============================================================================
+// Timestamp and Metadata Formatter Tests
+// ============================================================================
+
+describe('formatTimestamp', () => {
+  test('should format valid ISO timestamp', () => {
+    const timestamp = '2025-01-15T14:30:00Z';
+    const result = formatTimestamp(timestamp);
+    // Result varies by locale, but should contain date components
+    assert.strictEqual(typeof result, 'string');
+    assert.strictEqual(result.length > 0, true);
+  });
+
+  test('should return empty string for null', () => {
+    assert.strictEqual(formatTimestamp(null), '');
+  });
+
+  test('should return empty string for undefined', () => {
+    assert.strictEqual(formatTimestamp(undefined), '');
+  });
+
+  test('should return empty string for empty string', () => {
+    assert.strictEqual(formatTimestamp(''), '');
+  });
+
+  test('should return empty string for invalid date', () => {
+    assert.strictEqual(formatTimestamp('not-a-date'), '');
+    assert.strictEqual(formatTimestamp('invalid'), '');
+  });
+});
+
+describe('formatModifiedBy', () => {
+  test('should extract user displayName', () => {
+    const identitySet = {
+      user: { displayName: 'John Doe', email: 'john@example.com' },
+    };
+    assert.strictEqual(formatModifiedBy(identitySet), 'John Doe');
+  });
+
+  test('should fallback to user email if no displayName', () => {
+    const identitySet = {
+      user: { email: 'john@example.com' },
+    };
+    assert.strictEqual(formatModifiedBy(identitySet), 'john@example.com');
+  });
+
+  test('should fallback to application displayName', () => {
+    const identitySet = {
+      application: { displayName: 'Test App' },
+    };
+    assert.strictEqual(formatModifiedBy(identitySet), 'Test App');
+  });
+
+  test('should prefer user over application', () => {
+    const identitySet = {
+      user: { displayName: 'John Doe' },
+      application: { displayName: 'Test App' },
+    };
+    assert.strictEqual(formatModifiedBy(identitySet), 'John Doe');
+  });
+
+  test('should return empty string for null', () => {
+    assert.strictEqual(formatModifiedBy(null), '');
+  });
+
+  test('should return empty string for undefined', () => {
+    assert.strictEqual(formatModifiedBy(undefined), '');
+  });
+
+  test('should return empty string for empty object', () => {
+    assert.strictEqual(formatModifiedBy({}), '');
+  });
+
+  test('should return empty string if user has no name or email', () => {
+    const identitySet = { user: {} };
+    assert.strictEqual(formatModifiedBy(identitySet), '');
+  });
+});
+
+describe('formatMetadata', () => {
+  test('should format lastModifiedDateTime only', () => {
+    const item = {
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+    };
+    const result = formatMetadata(item);
+    assert.strictEqual(result.includes('Modified:'), true);
+  });
+
+  test('should format createdDateTime only', () => {
+    const item = {
+      createdDateTime: '2025-01-10T10:00:00Z',
+    };
+    const result = formatMetadata(item);
+    assert.strictEqual(result.includes('Created:'), true);
+  });
+
+  test('should format both timestamps', () => {
+    const item = {
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+      createdDateTime: '2025-01-10T10:00:00Z',
+    };
+    const result = formatMetadata(item);
+    assert.strictEqual(result.includes('Modified:'), true);
+    assert.strictEqual(result.includes('Created:'), true);
+    assert.strictEqual(result.includes(' | '), true);
+  });
+
+  test('should include modifiedBy user name', () => {
+    const item = {
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+      lastModifiedBy: {
+        user: { displayName: 'John Doe' },
+      },
+    };
+    const result = formatMetadata(item);
+    assert.strictEqual(result.includes('by John Doe'), true);
+  });
+
+  test('should return empty string for item with no metadata', () => {
+    const item = { id: 'test-id', displayName: 'Test' };
+    assert.strictEqual(formatMetadata(item), '');
+  });
+
+  test('should handle null lastModifiedBy gracefully', () => {
+    const item = {
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+      lastModifiedBy: null,
+    };
+    const result = formatMetadata(item);
+    assert.strictEqual(result.includes('Modified:'), true);
+    assert.strictEqual(result.includes('by'), false);
+  });
+});
+
+describe('formatItemInfo', () => {
+  test('should format basic item with displayName', () => {
+    const item = { id: 'test-id-12345', displayName: 'Test Notebook' };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('**Test Notebook**'), true);
+    assert.strictEqual(result.includes('ID: test-id-12345'), true);
+  });
+
+  test('should format item with title (for pages)', () => {
+    const item = { id: 'page-id-12345', title: 'Test Page' };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('**Test Page**'), true);
+  });
+
+  test('should show Untitled for items without name', () => {
+    const item = { id: 'test-id-12345' };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('**Untitled**'), true);
+  });
+
+  test('should include index prefix when provided', () => {
+    const item = { id: 'test-id-12345', displayName: 'Test' };
+    const result = formatItemInfo(item, 0);
+    assert.strictEqual(result.startsWith('1. '), true);
+  });
+
+  test('should format web link from links object', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      links: {
+        oneNoteWebUrl: { href: 'https://example.com/web' },
+      },
+    };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('[Web](https://example.com/web)'), true);
+  });
+
+  test('should format app link from links object', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      links: {
+        oneNoteClientUrl: { href: 'onenote://example.com/app' },
+      },
+    };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('[App](onenote://example.com/app)'), true);
+  });
+
+  test('should include metadata when available', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+      createdDateTime: '2025-01-10T10:00:00Z',
+    };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('Modified:'), true);
+    assert.strictEqual(result.includes('Created:'), true);
+  });
+
+  test('should format with modifiedBy information', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      lastModifiedDateTime: '2025-01-15T14:30:00Z',
+      lastModifiedBy: {
+        user: { displayName: 'John Doe' },
+      },
+    };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('by John Doe'), true);
+  });
+
+  test('should handle direct URL strings (not objects)', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      links: {
+        oneNoteWebUrl: 'https://example.com/direct',
+      },
+    };
+    const result = formatItemInfo(item);
+    assert.strictEqual(result.includes('[Web](https://example.com/direct)'), true);
+  });
+
+  test('should sanitize dangerous URLs', () => {
+    const item = {
+      id: 'test-id-12345',
+      displayName: 'Test',
+      links: {
+        oneNoteWebUrl: 'javascript:alert(1)',
+        oneNoteClientUrl: 'data:text/html,<script>alert(1)</script>',
+      },
+    };
+    const result = formatItemInfo(item);
+    // Dangerous URLs should be filtered out entirely (sanitizeUrl returns '#')
+    assert.strictEqual(result.includes('javascript:'), false);
+    assert.strictEqual(result.includes('data:'), false);
+    assert.strictEqual(result.includes('[Web]'), false);
+    assert.strictEqual(result.includes('[App]'), false);
   });
 });
 

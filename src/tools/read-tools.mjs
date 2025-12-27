@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { cachedApiCall, CacheKeys } from '../api/cache.mjs';
 import { createToolHandler } from '../api/retry.mjs';
-import { formatPageInfo, formatItemList } from '../utils/html.mjs';
+import { formatItemInfo, formatItemList, formatMetadata } from '../utils/html.mjs';
 import { validateAndFetchResource, fetchPageContentAdvanced } from '../utils/validation.mjs';
 import {
   escapeODataString,
@@ -26,11 +26,15 @@ export function registerReadTools(server, session) {
         const graphClient = session.getGraphClient();
         const response = await cachedApiCall(
           CacheKeys.notebooks(),
-          async () => await graphClient.api('/me/onenote/notebooks').get()
+          async () =>
+            await graphClient
+              .api('/me/onenote/notebooks')
+              .select('id,displayName,lastModifiedDateTime,createdDateTime,lastModifiedBy,links')
+              .get()
         );
 
         if (response.value && response.value.length > 0) {
-          const notebookList = response.value.map((nb, i) => formatPageInfo(nb, i)).join('\n\n');
+          const notebookList = response.value.map((nb, i) => formatItemInfo(nb, i)).join('\n\n');
           return {
             content: [
               {
@@ -67,11 +71,17 @@ export function registerReadTools(server, session) {
 
         const response = await cachedApiCall(
           CacheKeys.sections(notebookId, sectionGroupId),
-          async () => await graphClient.api(endpoint).get()
+          async () =>
+            await graphClient
+              .api(endpoint)
+              .select(
+                'id,displayName,lastModifiedDateTime,createdDateTime,lastModifiedBy,links,parentNotebook,parentSectionGroup'
+              )
+              .get()
         );
 
         if (response.value && response.value.length > 0) {
-          const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+          const list = response.value.map((item, i) => formatItemInfo(item, i)).join('\n\n');
           return {
             content: [
               {
@@ -105,9 +115,14 @@ export function registerReadTools(server, session) {
           endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sectionGroups`;
         }
 
-        const response = await graphClient.api(endpoint).get();
+        const response = await graphClient
+          .api(endpoint)
+          .select(
+            'id,displayName,lastModifiedDateTime,createdDateTime,lastModifiedBy,sectionGroupsUrl,sectionsUrl'
+          )
+          .get();
         if (response.value && response.value.length > 0) {
-          const list = response.value.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+          const list = response.value.map((item, i) => formatItemInfo(item, i)).join('\n\n');
           return {
             content: [
               {
@@ -138,7 +153,9 @@ export function registerReadTools(server, session) {
         const response = await graphClient
           .api('/me/onenote/sections')
           .filter(`contains(tolower(displayName), '${escapedQuery}')`)
-          .select('id,displayName,parentNotebook,parentSectionGroup')
+          .select(
+            'id,displayName,lastModifiedDateTime,createdDateTime,lastModifiedBy,links,parentNotebook,parentSectionGroup'
+          )
           .top(50)
           .get();
 
@@ -182,7 +199,7 @@ export function registerReadTools(server, session) {
 
         const response = await graphClient
           .api(`/me/onenote/sections/${validatedSectionId}/pages`)
-          .select('id,title,lastModifiedDateTime,links')
+          .select('id,title,lastModifiedDateTime,createdDateTime,links')
           .top(50)
           .get();
 
@@ -266,7 +283,7 @@ export function registerReadTools(server, session) {
           const sectionPagePromises = sections.map(async (section) => {
             let sectionRequest = graphClient
               .api(`/me/onenote/sections/${section.id}/pages`)
-              .select('id,title,lastModifiedDateTime,links')
+              .select('id,title,lastModifiedDateTime,createdDateTime,links')
               .top(50);
 
             if (filterConditions.length > 0) {
@@ -300,7 +317,7 @@ export function registerReadTools(server, session) {
 
         let request = graphClient
           .api('/me/onenote/pages')
-          .select('id,title,lastModifiedDateTime,links')
+          .select('id,title,lastModifiedDateTime,createdDateTime,links')
           .top(50);
 
         if (filterConditions.length > 0) {
@@ -377,7 +394,7 @@ export function registerReadTools(server, session) {
         const sectionPagePromises = sections.map(async (section) => {
           const sectionPages = await graphClient
             .api(`/me/onenote/sections/${section.id}/pages`)
-            .select('id,title,lastModifiedDateTime,links')
+            .select('id,title,lastModifiedDateTime,createdDateTime,links')
             .orderby('lastModifiedDateTime desc')
             .top(limit)
             .get();
@@ -430,18 +447,23 @@ export function registerReadTools(server, session) {
         const graphClient = session.getGraphClient();
         const validatedPageId = validateId(pageId, 'page');
 
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+        const pageInfo = await graphClient
+          .api(`/me/onenote/pages/${validatedPageId}`)
+          .select('id,title,lastModifiedDateTime,createdDateTime,links')
+          .get();
         const htmlContent = await fetchPageContentAdvanced(session, validatedPageId, 'httpDirect');
         let resultText = '';
+        const metadata = formatMetadata(pageInfo);
 
+        const metadataLine = metadata ? `\n${metadata}` : '';
         if (format === 'html') {
-          resultText = `📄 **${pageInfo.title}** (HTML Format)\n\n${htmlContent}`;
+          resultText = `📄 **${pageInfo.title}** (HTML Format)${metadataLine}\n\n${htmlContent}`;
         } else if (format === 'summary') {
           const summary = extractTextSummary(htmlContent);
-          resultText = `📄 **${pageInfo.title}** (Summary)\n\n${summary}`;
+          resultText = `📄 **${pageInfo.title}** (Summary)${metadataLine}\n\n${summary}`;
         } else {
           const textContent = extractReadableText(htmlContent);
-          resultText = `📄 **${pageInfo.title}**\n📅 Modified: ${new Date(pageInfo.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
+          resultText = `📄 **${pageInfo.title}**${metadataLine}\n\n${textContent}`;
         }
         return { content: [{ type: 'text', text: resultText }] };
       },
@@ -467,7 +489,7 @@ export function registerReadTools(server, session) {
         const pagesResponse = await graphClient
           .api('/me/onenote/pages')
           .filter(`contains(tolower(title), '${escapedTitle}')`)
-          .select('id,title,lastModifiedDateTime,links')
+          .select('id,title,lastModifiedDateTime,createdDateTime,links')
           .top(50)
           .get();
 
@@ -494,15 +516,17 @@ export function registerReadTools(server, session) {
 
         const matchingPage = matchingPages[0];
         const htmlContent = await fetchPageContentAdvanced(session, matchingPage.id, 'httpDirect');
+        const metadata = formatMetadata(matchingPage);
+        const metadataLine = metadata ? `\n${metadata}` : '';
         let resultText = '';
         if (format === 'html') {
-          resultText = `📄 **${matchingPage.title}** (HTML Format)\n\n${htmlContent}`;
+          resultText = `📄 **${matchingPage.title}** (HTML Format)${metadataLine}\n\n${htmlContent}`;
         } else if (format === 'summary') {
           const summary = extractTextSummary(htmlContent);
-          resultText = `📄 **${matchingPage.title}** (Summary)\n\n${summary}`;
+          resultText = `📄 **${matchingPage.title}** (Summary)${metadataLine}\n\n${summary}`;
         } else {
           const textContent = extractReadableText(htmlContent);
-          resultText = `📄 **${matchingPage.title}**\n📅 Modified: ${new Date(matchingPage.lastModifiedDateTime).toLocaleString()}\n\n${textContent}`;
+          resultText = `📄 **${matchingPage.title}**${metadataLine}\n\n${textContent}`;
         }
 
         if (matchingPages.length > 1) {

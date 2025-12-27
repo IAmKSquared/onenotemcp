@@ -1,23 +1,98 @@
-import { textToHtml } from '../utils/common.mjs';
+import { textToHtml, sanitizeUrl } from '../utils/common.mjs';
 import { DISPLAY_LIMITS } from '../config/constants.mjs';
 
 /**
- * Formats OneNote page information for display.
- * @param {object} page - The OneNote page object from Graph API.
- * @param {number | null} [index] - Optional index for numbered lists.
- * @returns {string} Formatted page information string.
+ * Formats an ISO 8601 timestamp to a localized string.
+ * @param {string | null | undefined} isoTimestamp - The ISO 8601 timestamp string.
+ * @returns {string} Localized date string, or empty string if input is invalid.
  */
-export function formatPageInfo(page, index = null) {
+export function formatTimestamp(isoTimestamp) {
+  if (!isoTimestamp) return '';
+  const date = new Date(isoTimestamp);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleString();
+}
+
+/**
+ * Extracts the display name from a Microsoft Graph identitySet object.
+ * @param {object | null | undefined} identitySet - The identitySet object from Graph API.
+ * @returns {string} The display name of the user or application, or empty string if unavailable.
+ */
+export function formatModifiedBy(identitySet) {
+  if (!identitySet) return '';
+  // Try user first, then application
+  const displayName =
+    identitySet.user?.displayName ||
+    identitySet.user?.email ||
+    identitySet.application?.displayName ||
+    '';
+  return displayName;
+}
+
+/**
+ * Formats metadata line with timestamps and modified-by info.
+ * @param {object} item - The item object with optional timestamp/identity fields.
+ * @returns {string} Formatted metadata line, or empty string if no metadata available.
+ */
+export function formatMetadata(item) {
+  const parts = [];
+
+  // Modified timestamp and user
+  if (item.lastModifiedDateTime) {
+    let modified = `Modified: ${formatTimestamp(item.lastModifiedDateTime)}`;
+    const modifiedBy = formatModifiedBy(item.lastModifiedBy);
+    if (modifiedBy) {
+      modified += ` by ${modifiedBy}`;
+    }
+    parts.push(modified);
+  }
+
+  // Created timestamp
+  if (item.createdDateTime) {
+    parts.push(`Created: ${formatTimestamp(item.createdDateTime)}`);
+  }
+
+  return parts.join(' | ');
+}
+
+/**
+ * Formats OneNote item information for display (pages, sections, notebooks, section groups).
+ * @param {object} item - The OneNote item object from Graph API.
+ * @param {number | null} [index] - Optional index for numbered lists.
+ * @returns {string} Formatted item information string.
+ */
+export function formatItemInfo(item, index = null) {
   const prefix = index !== null ? `${index + 1}. ` : '';
-  const name = page.displayName || page.title || 'Untitled';
-  // Graph API returns links as objects with href property
-  const webUrl = page.links?.oneNoteWebUrl?.href || page.links?.oneNoteWebUrl;
-  const appUrl = page.links?.oneNoteClientUrl?.href || page.links?.oneNoteClientUrl;
-  const webLink = webUrl && typeof webUrl === 'string' ? `[Web](${webUrl})` : '';
-  const appLink = appUrl && typeof appUrl === 'string' ? `[App](${appUrl})` : '';
+  const name = item.displayName || item.title || 'Untitled';
+
+  // Graph API returns links as objects with href property - sanitize for defense in depth
+  const webUrl = item.links?.oneNoteWebUrl?.href || item.links?.oneNoteWebUrl;
+  const appUrl = item.links?.oneNoteClientUrl?.href || item.links?.oneNoteClientUrl;
+  const safeWebUrl = webUrl && typeof webUrl === 'string' ? sanitizeUrl(webUrl) : '';
+  const safeAppUrl = appUrl && typeof appUrl === 'string' ? sanitizeUrl(appUrl) : '';
+  const webLink = safeWebUrl && safeWebUrl !== '#' ? `[Web](${safeWebUrl})` : '';
+  const appLink = safeAppUrl && safeAppUrl !== '#' ? `[App](${safeAppUrl})` : '';
   const links = [webLink, appLink].filter(Boolean).join(' | ');
-  const linksSuffix = links ? ` - ${links}` : '';
-  return `${prefix}**${name}** (ID: ${page.id})${linksSuffix}`;
+
+  // Build the output
+  let output = `${prefix}**${name}** (ID: ${item.id})`;
+
+  // Add metadata line if available
+  const metadata = formatMetadata(item);
+  if (metadata) {
+    output += `\n   ${metadata}`;
+  }
+
+  // Add links on separate line if metadata exists, otherwise inline
+  if (links) {
+    if (metadata) {
+      output += `\n   ${links}`;
+    } else {
+      output += ` - ${links}`;
+    }
+  }
+
+  return output;
 }
 
 /**
@@ -35,7 +110,7 @@ export function formatItemList(
   apiLimit = DISPLAY_LIMITS.API_RESULT_LIMIT
 ) {
   const displayItems = items.slice(0, maxDisplay);
-  const list = displayItems.map((item, i) => formatPageInfo(item, i)).join('\n\n');
+  const list = displayItems.map((item, i) => formatItemInfo(item, i)).join('\n\n');
   const more =
     items.length > maxDisplay ? `\n\n... and ${items.length - maxDisplay} more ${itemType}.` : '';
   const limitWarning =
