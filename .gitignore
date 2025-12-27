@@ -32,4 +32,8 @@ Thumbs.db
 *.swp
 *~
 .local-secret-key
+
+# Local Claude Code Configuration
 .claude/settings.local.json
+.claude/agents/
+.claude/commands/

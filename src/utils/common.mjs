@@ -91,6 +91,8 @@ export function extractTextSummary(html, maxLength = DISPLAY_LIMITS.SUMMARY_MAX_
     if (!html) return 'No content to summarize.';
     const dom = new JSDOM(html);
     const document = dom.window.document;
+    // Remove script and style elements to avoid including code in summaries
+    document.querySelectorAll('script, style').forEach((element) => element.remove());
     const bodyText = document.body?.textContent?.trim().replace(/\s+/g, ' ') || '';
     if (!bodyText) return 'No text content found in HTML body.';
     const summary = bodyText.substring(0, maxLength);
@@ -313,7 +315,9 @@ export function validateCsvData(csvString) {
     throw new Error('Table data must have at least a header row and one data row.');
   }
 
-  // Parse each row into cells (simple comma-split for now)
+  // Parse each row into cells using simple comma-split.
+  // Note: This does not support RFC 4180 quoted fields (e.g., "field, with comma").
+  // For LLM-generated tables, this limitation is acceptable.
   const parsedRows = rows.map((row) => row.split(',').map((cell) => cell.trim()));
 
   // Validate consistent column count

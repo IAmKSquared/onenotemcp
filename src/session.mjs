@@ -20,6 +20,7 @@ export class OneNoteSession {
   constructor() {
     this.accessToken = null;
     this.graphClient = null;
+    this.authError = null;
   }
 
   /**
@@ -37,6 +38,26 @@ export class OneNoteSession {
   setAccessToken(token) {
     this.accessToken = token;
     // Invalidate graph client when token changes
+    this.graphClient = null;
+    // Clear any previous auth error on successful token set
+    this.authError = null;
+  }
+
+  /**
+   * Gets the current auth error, if any.
+   * @returns {string | null} The auth error message or null.
+   */
+  getAuthError() {
+    return this.authError;
+  }
+
+  /**
+   * Sets an authentication error.
+   * @param {string} error - The error message.
+   */
+  setAuthError(error) {
+    this.authError = error;
+    this.accessToken = null;
     this.graphClient = null;
   }
 
@@ -75,6 +96,12 @@ export class OneNoteSession {
       await this.loadExistingToken();
     }
     if (!this.accessToken) {
+      // Provide more specific error if auth previously failed
+      if (this.authError) {
+        throw new Error(
+          `Authentication failed: ${this.authError}. Please try authenticating again using the "authenticate" tool.`
+        );
+      }
       throw new Error(
         'No access token available. Please authenticate first using the "authenticate" tool.'
       );

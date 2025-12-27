@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eshlon/onenote-mcp-server.git"
+    "url": "git+https://github.com/IAmKSquared/onenotemcp.git"
   },
   "keywords": [
     "mcp",
@@ -30,12 +30,12 @@
     "ai",
     "claude"
   ],
-  "author": "Ehsan Shahabi",
+  "author": "Kyle Klimek",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/[eshlon/onenote-mcp-server/issues"
+    "url": "https://github.com/IAmKSquared/onenotemcp/issues"
   },
-  "homepage": "https://github.com/[eshlon/onenote-mcp-server#readme",
+  "homepage": "https://github.com/IAmKSquared/onenotemcp#readme",
   "dependencies": {
     "@azure/identity": "^4.1.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",

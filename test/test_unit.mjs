@@ -229,7 +229,7 @@ describe('extractTextSummary', () => {
     const html =
       '<html><head><style>body{color:red}</style></head><body><p>Content</p><script>alert(1)</script></body></html>';
     const summary = extractTextSummary(html, 50);
-    assert.strictEqual(summary.includes('alert'), true); // textContent includes script text
+    assert.strictEqual(summary.includes('alert'), false); // script content should be stripped
     assert.strictEqual(summary.includes('Content'), true);
   });
 });

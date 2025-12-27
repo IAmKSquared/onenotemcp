@@ -57,6 +57,7 @@ export async function authenticateWithDeviceCode(session) {
       })
       .catch((error) => {
         logger.error({ err: error }, 'Background authentication failed');
+        session.setAuthError(error?.message || 'Authentication failed');
       });
 
     return {

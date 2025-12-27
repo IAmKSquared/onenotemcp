@@ -16,10 +16,12 @@ export async function fetchPageContentAdvanced(session, pageId, method = 'httpDi
   if (method === 'httpDirect') {
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!response.ok)
+    if (!response.ok) {
+      const errorBody = await response.text();
       throw new Error(
-        `HTTP error fetching page content! Status: ${response.status} ${response.statusText}`
+        `HTTP error fetching page content! Status: ${response.status} ${response.statusText}. Details: ${errorBody}`
       );
+    }
     return await response.text();
   } else {
     // 'direct'
@@ -55,7 +57,10 @@ export async function patchPageContent(
   });
 
   if (!response.ok) {
-    throw new Error(`${errorPrefix}: ${response.status} ${response.statusText}`);
+    const errorBody = await response.text();
+    throw new Error(
+      `${errorPrefix}: ${response.status} ${response.statusText}. Details: ${errorBody}`
+    );
   }
 
   return response;

@@ -11,8 +11,17 @@
 export const AUTH_CONFIG = {
   /**
    * Default Azure Application Client ID.
-   * Uses Microsoft Graph Explorer's public client ID for testing.
-   * Override with AZURE_CLIENT_ID environment variable for production.
+   *
+   * WARNING: This is Microsoft Graph Explorer's public client ID, intended for testing only.
+   * For production or shared deployments, register your own Azure AD application and set
+   * the AZURE_CLIENT_ID environment variable.
+   *
+   * To register your own app:
+   * 1. Go to https://portal.azure.com → Azure Active Directory → App registrations
+   * 2. Create a new registration with "Mobile and desktop applications" platform
+   * 3. Add redirect URI: https://login.microsoftonline.com/common/oauth2/nativeclient
+   * 4. Grant API permissions: Microsoft Graph → Notes.Read, Notes.ReadWrite, Notes.Create, User.Read
+   * 5. Set AZURE_CLIENT_ID environment variable to your app's client ID
    */
   DEFAULT_CLIENT_ID: '14d82eec-204b-4c2f-b7e8-296a70dab67e',
 
@@ -143,12 +152,12 @@ export const TIME_CONVERSION = {
  * Encryption settings for token storage.
  */
 export const ENCRYPTION = {
-  /** Algorithm used for token encryption */
-  ALGORITHM: 'aes-256-cbc',
+  /** Algorithm used for token encryption (GCM provides authenticated encryption) */
+  ALGORITHM: 'aes-256-gcm',
 
   /** Key length in bytes (32 bytes = 256 bits) */
   KEY_LENGTH_BYTES: 32,
 
-  /** Initialization vector length in bytes */
-  IV_LENGTH_BYTES: 16,
+  /** Initialization vector length in bytes (12 bytes is recommended for GCM) */
+  IV_LENGTH_BYTES: 12,
 };

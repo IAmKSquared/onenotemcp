@@ -88,8 +88,9 @@ export function registerWriteTools(server, session) {
       session,
       async ({ pageId, content: newContent, addTimestamp, addSeparator }) => {
         const graphClient = session.getGraphClient();
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        logger.info(`Appending content to page: "${pageInfo.title}" (ID: ${pageId})`);
+        const validatedPageId = validateId(pageId, 'page');
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+        logger.info(`Appending content to page: "${pageInfo.title}" (ID: ${validatedPageId})`);
 
         const htmlContentToAppend = textToHtml(newContent);
         let appendHtml = '';
@@ -99,7 +100,7 @@ export function registerWriteTools(server, session) {
 
         await patchPageContent(
           session,
-          pageId,
+          validatedPageId,
           [{ target: 'body', action: 'append', content: appendHtml }],
           'Append failed'
         );
@@ -127,15 +128,16 @@ export function registerWriteTools(server, session) {
       session,
       async ({ pageId, newTitle }) => {
         const graphClient = session.getGraphClient();
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
+        const validatedPageId = validateId(pageId, 'page');
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
         const oldTitle = pageInfo.title;
         logger.info(
-          `Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${pageId}"`
+          `Updating page title from "${oldTitle}" to "${newTitle}" for page ID "${validatedPageId}"`
         );
 
         await patchPageContent(
           session,
-          pageId,
+          validatedPageId,
           [{ target: 'title', action: 'replace', content: newTitle }],
           'Title update failed'
         );
@@ -169,9 +171,10 @@ export function registerWriteTools(server, session) {
       session,
       async ({ pageId, findText, replaceText, caseSensitive }) => {
         const graphClient = session.getGraphClient();
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        const htmlContent = await fetchPageContentAdvanced(session, pageId, 'httpDirect');
-        logger.info(`Replacing text in page: "${pageInfo.title}" (ID: ${pageId})`);
+        const validatedPageId = validateId(pageId, 'page');
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+        const htmlContent = await fetchPageContentAdvanced(session, validatedPageId, 'httpDirect');
+        logger.info(`Replacing text in page: "${pageInfo.title}" (ID: ${validatedPageId})`);
 
         const flags = caseSensitive ? 'g' : 'gi';
         const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
@@ -191,7 +194,7 @@ export function registerWriteTools(server, session) {
         const updatedContent = htmlContent.replace(regex, replaceText);
         await patchPageContent(
           session,
-          pageId,
+          validatedPageId,
           [{ target: 'body', action: 'replace', content: `<div>${updatedContent}</div>` }],
           'Replace failed'
         );
@@ -229,9 +232,10 @@ export function registerWriteTools(server, session) {
       session,
       async ({ pageId, note, noteType, position }) => {
         const graphClient = session.getGraphClient();
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
+        const validatedPageId = validateId(pageId, 'page');
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
         logger.info(
-          `Adding ${noteType} to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`
+          `Adding ${noteType} to page: "${pageInfo.title}" (ID: ${validatedPageId}) at ${position}`
         );
 
         const icons = { note: '📝', todo: '✅', important: '🚨', question: '❓' };
@@ -250,7 +254,7 @@ export function registerWriteTools(server, session) {
         const action = position === 'top' ? 'prepend' : 'append';
         await patchPageContent(
           session,
-          pageId,
+          validatedPageId,
           [{ target: 'body', action: action, content: noteHtml }],
           'Add note failed'
         );
@@ -272,7 +276,11 @@ export function registerWriteTools(server, session) {
     'addTableToPage',
     {
       pageId: z.string().describe('The ID of the page to add a table to.'),
-      tableData: z.string().describe('Table data in CSV format (header row, then data rows).'),
+      tableData: z
+        .string()
+        .describe(
+          'Table data in CSV format (header row, then data rows). Note: Simple CSV only - quoted fields with commas are not supported.'
+        ),
       title: z.string().describe('Optional title for the table.').optional(),
       position: z
         .enum(['top', 'bottom'])
@@ -284,8 +292,11 @@ export function registerWriteTools(server, session) {
       session,
       async ({ pageId, tableData, title, position }) => {
         const graphClient = session.getGraphClient();
-        const pageInfo = await graphClient.api(`/me/onenote/pages/${pageId}`).get();
-        logger.info(`Adding table to page: "${pageInfo.title}" (ID: ${pageId}) at ${position}`);
+        const validatedPageId = validateId(pageId, 'page');
+        const pageInfo = await graphClient.api(`/me/onenote/pages/${validatedPageId}`).get();
+        logger.info(
+          `Adding table to page: "${pageInfo.title}" (ID: ${validatedPageId}) at ${position}`
+        );
 
         const rows = validateCsvData(tableData);
 
@@ -297,7 +308,7 @@ export function registerWriteTools(server, session) {
         const action = position === 'top' ? 'prepend' : 'append';
         await patchPageContent(
           session,
-          pageId,
+          validatedPageId,
           [{ target: 'body', action: action, content: tableHtml }],
           'Add table failed'
         );

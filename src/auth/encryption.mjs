@@ -34,9 +34,9 @@ export async function getEncryptionKey() {
 }
 
 /**
- * Encrypts text using AES-256-CBC.
+ * Encrypts text using AES-256-GCM (authenticated encryption).
  * @param {string} text - The text to encrypt.
- * @returns {Promise<object>} The encrypted data { iv, encryptedData }.
+ * @returns {Promise<object>} The encrypted data { iv, encryptedData, authTag }.
  */
 export async function encrypt(text) {
   const key = await getEncryptionKey();
@@ -44,19 +44,27 @@ export async function encrypt(text) {
   const cipher = crypto.createCipheriv(ENCRYPTION.ALGORITHM, key, iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
-  return { iv: iv.toString('hex'), encryptedData: encrypted.toString('hex') };
+  const authTag = cipher.getAuthTag();
+  return {
+    iv: iv.toString('hex'),
+    encryptedData: encrypted.toString('hex'),
+    authTag: authTag.toString('hex'),
+  };
 }
 
 /**
- * Decrypts text using AES-256-CBC.
- * @param {object} text - The encrypted data object { iv, encryptedData }.
+ * Decrypts text using AES-256-GCM (authenticated encryption).
+ * @param {object} text - The encrypted data object { iv, encryptedData, authTag }.
  * @returns {Promise<string>} The decrypted text.
+ * @throws {Error} If the authentication tag is invalid (data was tampered with).
  */
 export async function decrypt(text) {
   const key = await getEncryptionKey();
   const iv = Buffer.from(text.iv, 'hex');
   const encryptedText = Buffer.from(text.encryptedData, 'hex');
+  const authTag = Buffer.from(text.authTag, 'hex');
   const decipher = crypto.createDecipheriv(ENCRYPTION.ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
