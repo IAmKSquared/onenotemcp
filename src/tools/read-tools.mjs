@@ -6,8 +6,10 @@ import { validateAndFetchResource, fetchPageContentAdvanced } from '../utils/val
 import {
   escapeODataString,
   validateId,
+  validateIsoDate,
   extractTextSummary,
   extractReadableText,
+  collectSettledResults,
 } from '../utils/common.mjs';
 import { DISPLAY_LIMITS } from '../config/constants.mjs';
 
@@ -62,15 +64,22 @@ export function registerReadTools(server, session) {
       async ({ notebookId, sectionGroupId }) => {
         const graphClient = session.getGraphClient();
         let endpoint = '/me/onenote/sections';
+        let cacheKey;
 
         if (notebookId) {
-          endpoint = `/me/onenote/notebooks/${notebookId}/sections`;
+          const validatedId = validateId(notebookId, 'notebook');
+          endpoint = `/me/onenote/notebooks/${validatedId}/sections`;
+          cacheKey = CacheKeys.sections(validatedId, undefined);
         } else if (sectionGroupId) {
-          endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sections`;
+          const validatedId = validateId(sectionGroupId, 'sectionGroup');
+          endpoint = `/me/onenote/sectionGroups/${validatedId}/sections`;
+          cacheKey = CacheKeys.sections(undefined, validatedId);
+        } else {
+          cacheKey = CacheKeys.sections(undefined, undefined);
         }
 
         const response = await cachedApiCall(
-          CacheKeys.sections(notebookId, sectionGroupId),
+          cacheKey,
           async () =>
             await graphClient
               .api(endpoint)
@@ -110,9 +119,11 @@ export function registerReadTools(server, session) {
         const graphClient = session.getGraphClient();
         let endpoint = '/me/onenote/sectionGroups';
         if (notebookId) {
-          endpoint = `/me/onenote/notebooks/${notebookId}/sectionGroups`;
+          const validatedNotebookId = validateId(notebookId, 'notebook');
+          endpoint = `/me/onenote/notebooks/${validatedNotebookId}/sectionGroups`;
         } else if (sectionGroupId) {
-          endpoint = `/me/onenote/sectionGroups/${sectionGroupId}/sectionGroups`;
+          const validatedSectionGroupId = validateId(sectionGroupId, 'sectionGroup');
+          endpoint = `/me/onenote/sectionGroups/${validatedSectionGroupId}/sectionGroups`;
         }
 
         const response = await graphClient
@@ -258,10 +269,12 @@ export function registerReadTools(server, session) {
         }
 
         if (modifiedAfter) {
+          validateIsoDate(modifiedAfter, 'modifiedAfter');
           filterConditions.push(`lastModifiedDateTime ge ${modifiedAfter}`);
         }
 
         if (modifiedBefore) {
+          validateIsoDate(modifiedBefore, 'modifiedBefore');
           filterConditions.push(`lastModifiedDateTime le ${modifiedBefore}`);
         }
 
@@ -294,8 +307,7 @@ export function registerReadTools(server, session) {
             return sectionPages.value || [];
           });
 
-          const sectionResults = await Promise.all(sectionPagePromises);
-          const allPages = sectionResults.flat();
+          const allPages = await collectSettledResults(sectionPagePromises, 'section(s)');
           const pages = allPages.slice(0, 50);
 
           if (pages.length > 0) {
@@ -401,8 +413,7 @@ export function registerReadTools(server, session) {
           return sectionPages.value || [];
         });
 
-        const sectionResults = await Promise.all(sectionPagePromises);
-        const allPages = sectionResults.flat();
+        const allPages = await collectSettledResults(sectionPagePromises, 'section(s)');
 
         // Sort merged results by lastModifiedDateTime descending
         allPages.sort(

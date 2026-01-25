@@ -1,6 +1,7 @@
+// @napi-rs/keyring uses CJS exports; destructure after default import
 import keyringPkg from '@napi-rs/keyring';
 const { Entry } = keyringPkg;
-import fs from 'fs';
+import { readFile, writeFile, unlink } from 'fs/promises';
 import { logger } from '../utils/logger.mjs';
 
 const SERVICE_NAME = 'onenote-mcp';
@@ -34,7 +35,7 @@ export class KeyStorage {
    */
   async getKey() {
     if (this.useFallback) {
-      return this._getKeyFromFile();
+      return await this._getKeyFromFile();
     }
 
     try {
@@ -53,7 +54,7 @@ export class KeyStorage {
    */
   async setKey(keyHex) {
     if (this.useFallback) {
-      return this._setKeyToFile(keyHex);
+      return await this._setKeyToFile(keyHex);
     }
 
     try {
@@ -64,7 +65,7 @@ export class KeyStorage {
         '⚠️ Failed to store key in OS keychain, falling back to file storage'
       );
       this.useFallback = true;
-      return this._setKeyToFile(keyHex);
+      return await this._setKeyToFile(keyHex);
     }
   }
 
@@ -74,7 +75,7 @@ export class KeyStorage {
    */
   async deleteKey() {
     if (this.useFallback) {
-      return this._deleteKeyFromFile();
+      return await this._deleteKeyFromFile();
     }
 
     try {
@@ -103,20 +104,24 @@ export class KeyStorage {
       return false;
     }
 
-    // Check if file exists
-    if (!fs.existsSync(this.fallbackFilePath)) {
+    let keyHex;
+    try {
+      // Read key from file (handles ENOENT if file doesn't exist)
+      keyHex = (await readFile(this.fallbackFilePath, 'utf8')).trim();
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return false; // No file to migrate
+      }
+      logger.warn({ err: error }, '⚠️ Failed to read key file for migration');
       return false;
     }
 
     try {
-      // Read key from file
-      const keyHex = fs.readFileSync(this.fallbackFilePath, 'utf8').trim();
-
       // Store in keyring
       await this.setKey(keyHex);
 
       // Delete old file
-      fs.unlinkSync(this.fallbackFilePath);
+      await unlink(this.fallbackFilePath);
 
       logger.info('✅ Successfully migrated encryption key from file to OS keychain');
       return true;
@@ -128,17 +133,16 @@ export class KeyStorage {
 
   /**
    * Gets key from fallback file storage.
-   * @returns {string|null} The key as hex string, or null if not found.
+   * @returns {Promise<string|null>} The key as hex string, or null if not found.
    * @private
    */
-  _getKeyFromFile() {
-    if (!fs.existsSync(this.fallbackFilePath)) {
-      return null;
-    }
-
+  async _getKeyFromFile() {
     try {
-      return fs.readFileSync(this.fallbackFilePath, 'utf8').trim();
+      return (await readFile(this.fallbackFilePath, 'utf8')).trim();
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return null; // File doesn't exist
+      }
       logger.error({ err: error }, 'Error reading key file');
       return null;
     }
@@ -147,12 +151,12 @@ export class KeyStorage {
   /**
    * Stores key to fallback file storage.
    * @param {string} keyHex - The key as hex string.
-   * @returns {void}
+   * @returns {Promise<void>}
    * @private
    */
-  _setKeyToFile(keyHex) {
+  async _setKeyToFile(keyHex) {
     try {
-      fs.writeFileSync(this.fallbackFilePath, keyHex, { mode: 0o600 });
+      await writeFile(this.fallbackFilePath, keyHex, { mode: 0o600 });
     } catch (error) {
       throw new Error(`Failed to write key file: ${error.message}`);
     }
@@ -160,16 +164,17 @@ export class KeyStorage {
 
   /**
    * Deletes key from fallback file storage.
-   * @returns {void}
+   * @returns {Promise<void>}
    * @private
    */
-  _deleteKeyFromFile() {
-    if (fs.existsSync(this.fallbackFilePath)) {
-      try {
-        fs.unlinkSync(this.fallbackFilePath);
-      } catch (error) {
+  async _deleteKeyFromFile() {
+    try {
+      await unlink(this.fallbackFilePath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
         logger.error({ err: error }, 'Error deleting key file');
       }
+      // ENOENT is fine - file already doesn't exist
     }
   }
 }

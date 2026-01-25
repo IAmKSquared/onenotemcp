@@ -1,8 +1,8 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import fs from 'fs';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { decrypt } from './auth/encryption.mjs';
+import { decrypt, DecryptionError } from './auth/encryption.mjs';
 import { TIME_CONVERSION } from './config/constants.mjs';
 import { logger } from './utils/logger.mjs';
 
@@ -117,57 +117,76 @@ export class OneNoteSession {
    * @returns {Promise<void>}
    */
   async loadExistingToken() {
+    let fileContent;
     try {
-      if (fs.existsSync(tokenFilePath)) {
-        const fileContent = fs.readFileSync(tokenFilePath, 'utf8');
-        let tokenDataStr;
-
-        try {
-          // Try to parse as JSON first to see if it's our encrypted format
-          const parsed = JSON.parse(fileContent);
-          if (parsed.iv && parsed.encryptedData) {
-            tokenDataStr = await decrypt(parsed);
-            logger.info('🔓 Decrypted token successfully');
-          } else {
-            // It's JSON but not encrypted (old format)
-            tokenDataStr = fileContent;
-            logger.warn('⚠️ Loaded unencrypted token (legacy format)');
-          }
-        } catch (_e) {
-          // Not JSON, likely plain text token (very old format)
-          tokenDataStr = fileContent;
-          logger.warn('⚠️ Loaded raw text token (legacy format)');
-        }
-
-        try {
-          const parsedToken = JSON.parse(tokenDataStr);
-
-          // Check if token has expired
-          if (parsedToken.expiresOn) {
-            const expiryDate = new Date(parsedToken.expiresOn);
-            const now = new Date();
-
-            if (expiryDate <= now) {
-              logger.warn(
-                `⚠️ Token has expired (expired on: ${expiryDate.toLocaleString()}). Please re-authenticate`
-              );
-              return; // Don't set accessToken
-            }
-
-            const hoursUntilExpiry = Math.floor((expiryDate - now) / TIME_CONVERSION.MS_PER_HOUR);
-            if (hoursUntilExpiry < 24) {
-              logger.warn(`⏰ Token expires in ${hoursUntilExpiry} hours`);
-            }
-          }
-
-          this.accessToken = parsedToken.token;
-        } catch (_parseError) {
-          this.accessToken = tokenDataStr; // Old format: plain token string
-        }
-      }
+      fileContent = await readFile(tokenFilePath, 'utf8');
     } catch (error) {
-      logger.error({ err: error }, 'Error loading token');
+      if (error.code === 'ENOENT') {
+        return; // File doesn't exist, nothing to load
+      }
+      logger.error({ err: error }, 'Error reading token file');
+      return;
     }
+
+    let tokenDataStr;
+
+    try {
+      // Try to parse as JSON first to see if it's our encrypted format
+      const parsed = JSON.parse(fileContent);
+      if (parsed.iv && parsed.encryptedData && parsed.authTag) {
+        tokenDataStr = await decrypt(parsed);
+        logger.info('🔓 Decrypted token successfully');
+      } else {
+        // It's JSON but not encrypted (old format)
+        tokenDataStr = fileContent;
+        logger.warn('⚠️ Loaded unencrypted token (legacy format)');
+      }
+    } catch (decryptError) {
+      if (decryptError instanceof DecryptionError) {
+        logger.error({ err: decryptError }, 'Failed to decrypt token - file may be corrupted');
+        return;
+      }
+      // Not JSON, likely plain text token (very old format)
+      tokenDataStr = fileContent;
+      logger.warn('⚠️ Loaded raw text token (legacy format)');
+    }
+
+    // Parse the token structure
+    let parsedToken;
+    try {
+      parsedToken = JSON.parse(tokenDataStr);
+    } catch (_parseError) {
+      // Old format: plain token string (no JSON structure)
+      if (typeof tokenDataStr === 'string' && tokenDataStr.length > 0) {
+        this.accessToken = tokenDataStr;
+      }
+      return;
+    }
+
+    if (!parsedToken?.token) {
+      logger.error('Token file has invalid structure');
+      return;
+    }
+
+    // Check if token has expired
+    if (parsedToken.expiresOn) {
+      const expiryDate = new Date(parsedToken.expiresOn);
+      const now = new Date();
+
+      if (expiryDate <= now) {
+        logger.warn(
+          `⚠️ Token has expired (expired on: ${expiryDate.toLocaleString()}). Please re-authenticate`
+        );
+        return;
+      }
+
+      const hoursUntilExpiry = Math.floor((expiryDate - now) / TIME_CONVERSION.MS_PER_HOUR);
+      if (hoursUntilExpiry < 24) {
+        logger.warn(`⏰ Token expires in ${hoursUntilExpiry} hours`);
+      }
+    }
+
+    this.accessToken = parsedToken.token;
   }
 
   /**

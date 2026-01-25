@@ -6,6 +6,14 @@ import { fetchPageContentAdvanced } from '../utils/validation.mjs';
 import { HTTP_STATUS } from '../config/constants.mjs';
 import { logger } from '../utils/logger.mjs';
 
+// Note styling for addNoteToPage
+const NOTE_STYLES = {
+  note: { icon: '📝', color: '#e3f2fd', borderColor: '#2196f3' },
+  todo: { icon: '✅', color: '#e8f5e8', borderColor: '#4caf50' },
+  important: { icon: '🚨', color: '#ffebee', borderColor: '#f44336' },
+  question: { icon: '❓', color: '#fff3e0', borderColor: '#ff9800' },
+};
+
 /**
  * Registers write/update-related tools with the MCP server.
  *
@@ -39,14 +47,7 @@ export function registerWriteTools(server, session) {
         logger.info(`Updating content for page: "${pageInfo.title}" (ID: ${validatedPageId})`);
 
         const htmlContentForUpdate = textToHtml(newContent);
-        const finalHtml = `
-      <div>
-        ${preserveTitle ? `<h1>${pageInfo.title}</h1>` : ''}
-        ${htmlContentForUpdate}
-        <hr>
-        <p><em>Updated via OneNote MCP on ${new Date().toLocaleString()}</em></p>
-      </div>
-    `;
+        const finalHtml = `<div>${preserveTitle ? `<h1>${textToHtml(pageInfo.title)}</h1>` : ''}${htmlContentForUpdate}<hr><p><em>Updated via OneNote MCP on ${new Date().toLocaleString()}</em></p></div>`;
 
         await patchPageContent(
           session,
@@ -238,18 +239,9 @@ export function registerWriteTools(server, session) {
           `Adding ${noteType} to page: "${pageInfo.title}" (ID: ${validatedPageId}) at ${position}`
         );
 
-        const icons = { note: '📝', todo: '✅', important: '🚨', question: '❓' };
-        const colors = {
-          note: '#e3f2fd',
-          todo: '#e8f5e8',
-          important: '#ffebee',
-          question: '#fff3e0',
-        };
-        const noteHtml = `
-      <div style="border-left: 4px solid #2196f3; background-color: ${colors[noteType]}; padding: 10px; margin: 10px 0;">
-        <p><strong>${icons[noteType]} ${noteType.charAt(0).toUpperCase() + noteType.slice(1)}</strong> - <em>${new Date().toLocaleString()}</em></p>
-        <p>${textToHtml(note)}</p>
-      </div>`;
+        const style = NOTE_STYLES[noteType] || NOTE_STYLES.note;
+        const label = noteType.charAt(0).toUpperCase() + noteType.slice(1);
+        const noteHtml = `<div style="border-left: 4px solid ${style.borderColor}; background-color: ${style.color}; padding: 10px; margin: 10px 0;"><p><strong>${style.icon} ${label}</strong> - <em>${new Date().toLocaleString()}</em></p><p>${textToHtml(note)}</p></div>`;
 
         const action = position === 'top' ? 'prepend' : 'append';
         await patchPageContent(

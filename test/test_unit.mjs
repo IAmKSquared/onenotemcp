@@ -9,6 +9,7 @@ import {
   escapeODataString,
   sanitizeUrl,
   validateId,
+  validateIsoDate,
   extractTextSummary,
   extractReadableText,
   textToHtml,
@@ -183,6 +184,42 @@ describe('validateId', () => {
   test('should use custom type in error messages', () => {
     assert.throws(() => validateId('', 'page'), /Invalid page ID/);
     assert.throws(() => validateId('', 'notebook'), /Invalid notebook ID/);
+  });
+});
+
+describe('validateIsoDate', () => {
+  test('should accept valid YYYY-MM-DD format', () => {
+    assert.strictEqual(validateIsoDate('2024-01-15', 'testDate'), '2024-01-15');
+    assert.strictEqual(validateIsoDate('2025-12-31', 'testDate'), '2025-12-31');
+  });
+
+  test('should accept valid YYYY-MM-DDTHH:MM:SSZ format', () => {
+    assert.strictEqual(validateIsoDate('2024-01-15T14:30:00Z', 'testDate'), '2024-01-15T14:30:00Z');
+  });
+
+  test('should accept datetime without Z suffix', () => {
+    assert.strictEqual(validateIsoDate('2024-01-15T14:30:00', 'testDate'), '2024-01-15T14:30:00');
+  });
+
+  test('should reject invalid format', () => {
+    assert.throws(() => validateIsoDate('01-15-2024', 'testDate'), /Invalid testDate.*ISO 8601/);
+    assert.throws(() => validateIsoDate('2024/01/15', 'testDate'), /Invalid testDate.*ISO 8601/);
+    assert.throws(() => validateIsoDate('Jan 15, 2024', 'testDate'), /Invalid testDate.*ISO 8601/);
+  });
+
+  test('should reject invalid dates that match format', () => {
+    assert.throws(() => validateIsoDate('2024-13-01', 'testDate'), /not a valid date/);
+    assert.throws(() => validateIsoDate('2024-01-45', 'testDate'), /not a valid date/);
+  });
+
+  test('should reject null/undefined', () => {
+    assert.throws(() => validateIsoDate(null, 'testDate'), /expected a date string/);
+    assert.throws(() => validateIsoDate(undefined, 'testDate'), /expected a date string/);
+  });
+
+  test('should use param name in error messages', () => {
+    assert.throws(() => validateIsoDate('bad', 'modifiedAfter'), /Invalid modifiedAfter/);
+    assert.throws(() => validateIsoDate('bad', 'modifiedBefore'), /Invalid modifiedBefore/);
   });
 });
 
@@ -598,18 +635,26 @@ describe('validateCsvData', () => {
     assert.strictEqual(result[1][1], "'=SUM(A1:A10)");
   });
 
-  test('should sanitize cells with + prefix', () => {
+  test('should allow positive numbers with + prefix', () => {
     const csv = 'Name,Value\nJohn,+123';
     const result = validateCsvData(csv);
 
-    assert.strictEqual(result[1][1], "'+123");
+    assert.strictEqual(result[1][1], '+123');
   });
 
-  test('should sanitize cells with - prefix', () => {
+  test('should allow negative numbers with - prefix', () => {
     const csv = 'Name,Value\nJohn,-123';
     const result = validateCsvData(csv);
 
-    assert.strictEqual(result[1][1], "'-123");
+    assert.strictEqual(result[1][1], '-123');
+  });
+
+  test('should sanitize formula-like strings starting with + or -', () => {
+    const csv = 'Name,Formula1,Formula2\nJohn,-1+1,+1-1';
+    const result = validateCsvData(csv);
+
+    assert.strictEqual(result[1][1], "'-1+1");
+    assert.strictEqual(result[1][2], "'+1-1");
   });
 
   test('should sanitize cells with @ prefix', () => {
@@ -656,13 +701,13 @@ describe('validateCsvData', () => {
     assert.strictEqual(result[2].length, 6);
   });
 
-  test('should sanitize multiple dangerous cells', () => {
+  test('should sanitize multiple dangerous cells but allow numbers', () => {
     const csv = 'Col1,Col2,Col3\n=FORMULA(),+123,-456\n@handle,normal,=ANOTHER()';
     const result = validateCsvData(csv);
 
     assert.strictEqual(result[1][0], "'=FORMULA()");
-    assert.strictEqual(result[1][1], "'+123");
-    assert.strictEqual(result[1][2], "'-456");
+    assert.strictEqual(result[1][1], '+123'); // Valid number, not sanitized
+    assert.strictEqual(result[1][2], '-456'); // Valid number, not sanitized
     assert.strictEqual(result[2][0], "'@handle");
     assert.strictEqual(result[2][1], 'normal');
     assert.strictEqual(result[2][2], "'=ANOTHER()");

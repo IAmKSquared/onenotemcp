@@ -1,4 +1,4 @@
-import fs from 'fs';
+import { writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { encrypt } from './encryption.mjs';
@@ -15,10 +15,7 @@ const tokenFilePath = path.join(__dirname, '..', '..', '.access-token.txt');
  * @returns {Promise<void>}
  */
 export async function saveToken(tokenData) {
-  // Encrypt before saving
   const encryptedToken = await encrypt(JSON.stringify(tokenData));
-  fs.writeFileSync(tokenFilePath, JSON.stringify(encryptedToken, null, 2), {
-    mode: 0o600,
-  });
+  await writeFile(tokenFilePath, JSON.stringify(encryptedToken, null, 2), { mode: 0o600 });
   logger.info('🔒 Token saved securely (encrypted)');
 }

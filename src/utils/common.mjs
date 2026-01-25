@@ -82,6 +82,35 @@ export function validateId(id, type = 'resource') {
 }
 
 /**
+ * Validates an ISO 8601 date string format.
+ * @param {string} dateStr - The date string to validate.
+ * @param {string} paramName - Parameter name for error messages.
+ * @returns {string} The validated date string.
+ * @throws {Error} If the format is invalid.
+ */
+export function validateIsoDate(dateStr, paramName = 'date') {
+  if (!dateStr || typeof dateStr !== 'string') {
+    throw new Error(`Invalid ${paramName}: expected a date string`);
+  }
+
+  // Accept: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ (with optional Z)
+  const isoPattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z?)?$/;
+  if (!isoPattern.test(dateStr)) {
+    throw new Error(
+      `Invalid ${paramName}: expected ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ), got "${dateStr}"`
+    );
+  }
+
+  // Verify it's an actual valid date (not 2024-13-45)
+  const parsed = new Date(dateStr);
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Invalid ${paramName}: "${dateStr}" is not a valid date`);
+  }
+
+  return dateStr;
+}
+
+/**
  * Extracts a short summary from HTML content
  * @param {string} html - The HTML content string
  * @param {number} [maxLength] - The maximum length of the summary
@@ -209,10 +238,6 @@ export function textToHtml(text) {
     .join('\n');
 
   html = html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
-  html = html.replace(
-    /(<blockquote>.*?<\/blockquote>(?:\s*<blockquote>.*?<\/blockquote>)*)/gs,
-    '<blockquote>$1</blockquote>'
-  );
 
   return html;
 }
@@ -343,6 +368,25 @@ export function validateCsvData(csvString) {
 }
 
 /**
+ * Collects results from Promise.allSettled, logging failures and returning successful values.
+ * @param {Promise<T>[]} promises - Array of promises to settle.
+ * @param {string} [context] - Context string for warning messages (e.g., 'section(s)').
+ * @returns {Promise<T[]>} Flattened array of successful results.
+ * @template T
+ */
+export async function collectSettledResults(promises, context = 'item(s)') {
+  const results = await Promise.allSettled(promises);
+  const successful = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
+  const failedCount = results.filter((r) => r.status === 'rejected').length;
+  if (failedCount > 0) {
+    logger.warn(`${failedCount} ${context} failed to fetch`);
+  }
+  return successful.flat();
+}
+
+/**
  * Sanitizes a single CSV cell to prevent injection attacks.
  * @param {string} cell - The cell value to sanitize.
  * @returns {string} The sanitized cell value.
@@ -357,6 +401,11 @@ function sanitizeCsvCell(cell) {
   // Check for dangerous formula prefixes
   const dangerousPrefixes = ['=', '+', '-', '@', '\t', '\r'];
   if (dangerousPrefixes.some((prefix) => trimmed.startsWith(prefix))) {
+    // Allow valid finite numbers (e.g., -42, +3.14, -1e5)
+    const num = Number(trimmed);
+    if (!isNaN(num) && isFinite(num)) {
+      return trimmed;
+    }
     // Prepend single quote to neutralize formula interpretation
     return `'${trimmed}`;
   }

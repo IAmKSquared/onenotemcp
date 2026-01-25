@@ -5,6 +5,21 @@ import { KeyStorage } from './key-storage.mjs';
 import { ENCRYPTION } from '../config/constants.mjs';
 import { logger } from '../utils/logger.mjs';
 
+/**
+ * Custom error class for decryption failures.
+ * Use instanceof DecryptionError to detect decryption-specific errors.
+ */
+export class DecryptionError extends Error {
+  /**
+   *
+   * @param message
+   */
+  constructor(message) {
+    super(message);
+    this.name = 'DecryptionError';
+  }
+}
+
 // --- Configuration ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +54,9 @@ export async function getEncryptionKey() {
  * @returns {Promise<object>} The encrypted data { iv, encryptedData, authTag }.
  */
 export async function encrypt(text) {
+  if (typeof text !== 'string') {
+    throw new Error('encrypt() requires a string input');
+  }
   const key = await getEncryptionKey();
   const iv = crypto.randomBytes(ENCRYPTION.IV_LENGTH_BYTES);
   const cipher = crypto.createCipheriv(ENCRYPTION.ALGORITHM, key, iv);
@@ -56,9 +74,19 @@ export async function encrypt(text) {
  * Decrypts text using AES-256-GCM (authenticated encryption).
  * @param {object} text - The encrypted data object { iv, encryptedData, authTag }.
  * @returns {Promise<string>} The decrypted text.
- * @throws {Error} If the authentication tag is invalid (data was tampered with).
+ * @throws {DecryptionError} If the input is invalid or authentication tag is invalid (data was tampered with).
  */
 export async function decrypt(text) {
+  // Validate input structure
+  if (!text || typeof text !== 'object') {
+    throw new DecryptionError('Invalid encrypted data: expected object');
+  }
+  if (!text.iv || !text.encryptedData || !text.authTag) {
+    throw new DecryptionError(
+      'Invalid encrypted data: missing required fields (iv, encryptedData, authTag)'
+    );
+  }
+
   const key = await getEncryptionKey();
   const iv = Buffer.from(text.iv, 'hex');
   const encryptedText = Buffer.from(text.encryptedData, 'hex');
