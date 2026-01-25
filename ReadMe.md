@@ -102,7 +102,8 @@ onenote-mcp-server/
 │   │   ├── auth-tools.mjs         # Authentication tools
 │   │   ├── read-tools.mjs         # Read operations (list, search, get)
 │   │   ├── write-tools.mjs        # Edit operations (update, append, replace)
-│   │   └── create-tools.mjs       # Creation tools (notebooks, sections, pages)
+│   │   ├── create-tools.mjs       # Creation tools (notebooks, sections, pages)
+│   │   └── delete-tools.mjs       # Delete operations (pages)
 │   ├── utils/              # Shared utilities
 │   │   ├── common.mjs             # Core utilities (validation, conversion, cache)
 │   │   ├── html.mjs               # HTML formatting helpers
@@ -113,9 +114,9 @@ onenote-mcp-server/
 │   ├── session.mjs         # Session state management
 │   └── server.mjs          # Main entry point
 ├── test/                   # Test suite
-│   ├── test_unit.mjs              # 96 unit tests
+│   ├── test_unit.mjs              # 132 unit tests
 │   ├── test_smoke.mjs             # Server startup verification
-│   └── test_integration.mjs       # 50 integration tests
+│   └── test_integration.mjs       # 55 integration tests
 └── package.json
 ```
 
@@ -125,7 +126,7 @@ onenote-mcp-server/
 - **Session management:** Encapsulated state via `OneNoteSession` class (no
   global variables)
 - **Centralized configuration:** All magic numbers replaced with named constants
-- **Comprehensive testing:** 151 tests covering security, functionality, and
+- **Comprehensive testing:** 187+ tests covering security, functionality, and
   integration
 
 ## Configuration
@@ -400,14 +401,14 @@ npm test
 **Run specific test types:**
 
 ```bash
-npm run test:unit         # Unit tests (96 tests for utility functions)
+npm run test:unit         # Unit tests (132 tests for utility functions)
 npm run test:smoke        # Smoke test (verifies server starts and tools are registered)
 npm run test:integration  # Integration tests (55 tests for core functionality)
 ```
 
 ### Test Structure
 
-- **test/test_unit.mjs** - Unit tests (96 tests) for utility functions
+- **test/test_unit.mjs** - Unit tests (132 tests) for utility functions
   (escapeODataString, sanitizeUrl, validateId, extractReadableText,
   extractTextSummary, textToHtml, Cache class, CSV validation)
 - **test/test_smoke.mjs** - Smoke test that verifies the MCP server starts and
