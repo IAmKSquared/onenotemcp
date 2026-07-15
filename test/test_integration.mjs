@@ -8,9 +8,10 @@ import { test, describe, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { formatItemInfo, formatItemList } from '../src/utils/html.mjs';
+import { formatItemInfo, formatItemList, createPageHtml } from '../src/utils/html.mjs';
+import { retryWithBackoff, getDetailedErrorMessage } from '../src/api/retry.mjs';
+import { encrypt, decrypt } from '../src/auth/encryption.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,118 +42,52 @@ afterEach(() => {
 // ============================================================================
 
 describe('Encryption and Decryption', () => {
-  const ALGORITHM = 'aes-256-cbc';
-  const IV_LENGTH = 16;
+  // These tests exercise the REAL encryption module (AES-256-GCM), which manages
+  // its own key via KeyStorage. The basic round-trip, structural DecryptionError
+  // cases, and encrypt() input validation are already covered in test_tools.mjs;
+  // the tests here add value by verifying IV uniqueness, payload variety, and
+  // authentication-tag tamper detection.
 
   /**
-   * Standalone encryption function for testing
-   * @param {string} text - The text to encrypt
-   * @param {Buffer} key - The encryption key
-   * @returns {Promise<{iv: string, encryptedData: string}>} Encrypted data with IV
+   * Flips the first hex character to produce different-but-valid hex of the
+   * same length, simulating tampering with an encrypted field.
+   * @param {string} hex - The hex string to tamper with.
+   * @returns {string} The tampered hex string.
    */
-  async function testEncrypt(text, key) {
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return { iv: iv.toString('hex'), encryptedData: encrypted.toString('hex') };
+  function tamperHex(hex) {
+    const replacement = hex[0] === 'a' ? 'b' : 'a';
+    return replacement + hex.slice(1);
   }
-
-  /**
-   * Standalone decryption function for testing
-   * @param {{iv: string, encryptedData: string}} encryptedObj - The encrypted data object
-   * @param {Buffer} key - The decryption key
-   * @returns {Promise<string>} The decrypted text
-   */
-  async function testDecrypt(encryptedObj, key) {
-    const iv = Buffer.from(encryptedObj.iv, 'hex');
-    const encryptedText = Buffer.from(encryptedObj.encryptedData, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-  }
-
-  test('should encrypt and decrypt text correctly', async () => {
-    const originalText = 'test-token-12345';
-    const key = crypto.randomBytes(32);
-
-    const encrypted = await testEncrypt(originalText, key);
-    const decrypted = await testDecrypt(encrypted, key);
-
-    assert.strictEqual(decrypted, originalText);
-  });
 
   test('should use unique IVs for each encryption', async () => {
     const text = 'same-text';
-    const key = crypto.randomBytes(32);
 
-    const enc1 = await testEncrypt(text, key);
-    const enc2 = await testEncrypt(text, key);
+    const enc1 = await encrypt(text);
+    const enc2 = await encrypt(text);
 
-    // IVs should be different
+    // Random IVs mean the same plaintext yields different ciphertext each time.
     assert.notStrictEqual(enc1.iv, enc2.iv);
-    // Encrypted data should be different due to different IVs
     assert.notStrictEqual(enc1.encryptedData, enc2.encryptedData);
 
-    // But both should decrypt to the same text
-    const dec1 = await testDecrypt(enc1, key);
-    const dec2 = await testDecrypt(enc2, key);
-    assert.strictEqual(dec1, text);
-    assert.strictEqual(dec2, text);
-  });
-
-  test('should produce different encrypted data for different inputs', async () => {
-    const key = crypto.randomBytes(32);
-
-    const enc1 = await testEncrypt('text1', key);
-    const enc2 = await testEncrypt('text2', key);
-
-    assert.notStrictEqual(enc1.encryptedData, enc2.encryptedData);
-  });
-
-  test('should fail decryption with wrong key', async () => {
-    const text = 'secret-data';
-    const correctKey = crypto.randomBytes(32);
-    const wrongKey = crypto.randomBytes(32);
-
-    const encrypted = await testEncrypt(text, correctKey);
-
-    // Attempting to decrypt with wrong key should throw or produce garbage
-    await assert.rejects(
-      async () => await testDecrypt(encrypted, wrongKey),
-      {
-        name: 'Error',
-      },
-      'Should fail to decrypt with wrong key'
-    );
-  });
-
-  test('should handle empty strings', async () => {
-    const key = crypto.randomBytes(32);
-
-    const encrypted = await testEncrypt('', key);
-    const decrypted = await testDecrypt(encrypted, key);
-
-    assert.strictEqual(decrypted, '');
+    // But both still decrypt back to the same text.
+    assert.strictEqual(await decrypt(enc1), text);
+    assert.strictEqual(await decrypt(enc2), text);
   });
 
   test('should handle long strings', async () => {
     const longText = 'a'.repeat(10000);
-    const key = crypto.randomBytes(32);
 
-    const encrypted = await testEncrypt(longText, key);
-    const decrypted = await testDecrypt(encrypted, key);
+    const encrypted = await encrypt(longText);
+    const decrypted = await decrypt(encrypted);
 
     assert.strictEqual(decrypted, longText);
   });
 
   test('should handle special characters', async () => {
     const specialText = 'Special: <>&quot; symbols @#$%^&*()';
-    const key = crypto.randomBytes(32);
 
-    const encrypted = await testEncrypt(specialText, key);
-    const decrypted = await testDecrypt(encrypted, key);
+    const encrypted = await encrypt(specialText);
+    const decrypted = await decrypt(encrypted);
 
     assert.strictEqual(decrypted, specialText);
   });
@@ -163,13 +98,42 @@ describe('Encryption and Decryption', () => {
       expiresOn: '2025-12-31T23:59:59Z',
       scopes: ['Notes.Read', 'Notes.ReadWrite'],
     });
-    const key = crypto.randomBytes(32);
 
-    const encrypted = await testEncrypt(jsonText, key);
-    const decrypted = await testDecrypt(encrypted, key);
+    const encrypted = await encrypt(jsonText);
+    const decrypted = await decrypt(encrypted);
 
     assert.strictEqual(decrypted, jsonText);
     assert.doesNotThrow(() => JSON.parse(decrypted));
+  });
+
+  test('should reject decryption when the authTag is tampered with', async () => {
+    const encrypted = await encrypt('secret-data');
+    const tampered = { ...encrypted, authTag: tamperHex(encrypted.authTag) };
+
+    // GCM authentication fails inside decipher.final(), which throws a native
+    // Error (not a DecryptionError, which only guards structural validation).
+    await assert.rejects(
+      async () => decrypt(tampered),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.notStrictEqual(error.name, 'DecryptionError');
+        return true;
+      }
+    );
+  });
+
+  test('should reject decryption when the ciphertext is tampered with', async () => {
+    const encrypted = await encrypt('secret-data');
+    const tampered = { ...encrypted, encryptedData: tamperHex(encrypted.encryptedData) };
+
+    await assert.rejects(
+      async () => decrypt(tampered),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.notStrictEqual(error.name, 'DecryptionError');
+        return true;
+      }
+    );
   });
 });
 
@@ -178,47 +142,10 @@ describe('Encryption and Decryption', () => {
 // ============================================================================
 
 describe('retryWithBackoff', () => {
-  /**
-   * Standalone retry function for testing
-   * @param {() => Promise<any>} fn - The async function to retry
-   * @param {number} maxRetries - Maximum number of retry attempts
-   * @param {number} baseDelay - Base delay in milliseconds for exponential backoff
-   * @returns {Promise<any>} The result of the function
-   */
-  async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
-    let lastError;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error;
-
-        // Don't retry on these errors
-        const nonRetryableErrors = [400, 401, 403, 404, 409];
-        if (error.statusCode && nonRetryableErrors.includes(error.statusCode)) {
-          throw error;
-        }
-
-        // Retry on rate limits (429) and server errors (500+)
-        const shouldRetry =
-          error.statusCode === 429 || // Rate limit
-          (error.statusCode >= 500 && error.statusCode < 600) || // Server errors
-          error.code === 'ETIMEDOUT' || // Timeout
-          error.code === 'ECONNRESET'; // Connection reset
-
-        if (!shouldRetry || attempt === maxRetries) {
-          throw error;
-        }
-
-        // Calculate delay with exponential backoff
-        const delay = baseDelay * Math.pow(2, attempt);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
-    throw lastError;
-  }
+  // Exercises the REAL retryWithBackoff from src/api/retry.mjs. Signature is
+  // (fn, maxRetries, baseDelay); baseDelay is kept small so tests stay fast.
+  // Non-retryable status codes come from NON_RETRYABLE_STATUS_CODES in
+  // constants (400, 401, 403, 404, 409); backoff multiplier is 2.
 
   test('should succeed on first attempt', async () => {
     const fn = mock.fn(async () => 'success');
@@ -427,67 +354,9 @@ describe('retryWithBackoff', () => {
 // ============================================================================
 
 describe('getDetailedErrorMessage', () => {
-  /**
-   * Standalone error message function for testing
-   * @param {Error} error - The error object
-   * @param {string} errorPrefix - The prefix for the error message
-   * @returns {string} The formatted error message
-   */
-  function getDetailedErrorMessage(error, errorPrefix) {
-    const statusCode = error.statusCode || error.status;
-    const errorMessage = error.message || 'Unknown error';
-
-    // Authentication errors
-    if (
-      statusCode === 401 ||
-      errorMessage.includes('authenticate') ||
-      errorMessage.includes('Access token')
-    ) {
-      return "= **Authentication Required**\nYour access token has expired or is invalid. Please run the 'authenticate' tool to sign in again.";
-    }
-
-    // Permission errors
-    if (statusCode === 403) {
-      return "= **Permission Denied**\nYou don't have permission to perform this action. Ensure your account has the required OneNote permissions (Notes.Read, Notes.ReadWrite, Notes.Create).";
-    }
-
-    // Not found errors
-    if (statusCode === 404) {
-      return `L **Resource Not Found**\n${errorMessage}\n\nThe requested item doesn't exist. It may have been deleted or the ID is incorrect.`;
-    }
-
-    // Rate limit errors
-    if (statusCode === 429) {
-      return '� **Rate Limit Exceeded**\nToo many requests. Please wait a moment before trying again. (All retry attempts exhausted)';
-    }
-
-    // Server errors
-    if (statusCode >= 500 && statusCode < 600) {
-      return `=' **Server Error** (${statusCode})\nMicrosoft's OneNote service is experiencing issues. Please try again in a few moments. (All retry attempts exhausted)`;
-    }
-
-    // Timeout errors
-    if (error.code === 'ETIMEDOUT' || errorMessage.includes('timeout')) {
-      return '� **Request Timeout**\nThe request took too long to complete. Please check your network connection and try again.';
-    }
-
-    // Network errors
-    if (
-      error.code === 'ECONNRESET' ||
-      error.code === 'ENOTFOUND' ||
-      error.code === 'ECONNREFUSED'
-    ) {
-      return '< **Network Error**\nUnable to connect to Microsoft services. Please check your internet connection.';
-    }
-
-    // Token expiration (specific message format from Azure)
-    if (errorMessage.includes('token') && errorMessage.includes('expired')) {
-      return "= **Token Expired**\nYour authentication token has expired. Please run the 'authenticate' tool to sign in again.";
-    }
-
-    // Default error message
-    return `L **${errorPrefix}**\n${errorMessage}`;
-  }
+  // Exercises the REAL getDetailedErrorMessage from src/api/retry.mjs.
+  // Assertions match the stable text portions of each message rather than the
+  // exact emoji prefixes, so they stay robust against emoji encoding.
 
   test('should handle 401 authentication errors', () => {
     const error = new Error('Unauthorized');
@@ -799,40 +668,11 @@ describe('formatItemList', () => {
 });
 
 describe('createPageHtml', () => {
-  /**
-   * Convert text to HTML paragraph
-   * @param {string} text - The text to convert
-   * @returns {string} HTML paragraph or empty string
-   */
-  function textToHtml(text) {
-    if (!text) return '';
-    return `<p>${text}</p>`;
-  }
+  // Exercises the REAL createPageHtml from src/utils/html.mjs. The title is
+  // plain-HTML-escaped (markdown is NOT applied to it), while the body content
+  // still goes through textToHtml. See GitHub issue #4.
 
-  /**
-   * Create HTML page content
-   * @param {string} title - The page title
-   * @param {string} content - The page content
-   * @returns {string} Complete HTML document
-   */
-  function createPageHtml(title, content) {
-    const htmlContent = textToHtml(content);
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <title>${textToHtml(title)}</title>
-  <meta charset="utf-8">
-</head>
-<body>
-  <h1>${textToHtml(title)}</h1>
-  ${htmlContent}
-  <hr>
-  <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>
-</body>
-</html>`;
-  }
-
-  test('should create valid HTML document', () => {
+  test('should create valid HTML document skeleton', () => {
     const html = createPageHtml('Test Title', 'Test content');
 
     assert.strictEqual(html.includes('<!DOCTYPE html>'), true);
@@ -840,20 +680,20 @@ describe('createPageHtml', () => {
     assert.strictEqual(html.includes('</html>'), true);
     assert.strictEqual(html.includes('<head>'), true);
     assert.strictEqual(html.includes('<body>'), true);
+    assert.strictEqual(html.includes('<meta charset="utf-8">'), true);
   });
 
   test('should include title in head and body', () => {
     const html = createPageHtml('My Page', 'Content');
 
-    assert.strictEqual(html.includes('<title>'), true);
-    assert.strictEqual(html.includes('<h1>'), true);
-    assert.strictEqual(html.includes('My Page'), true);
+    assert.strictEqual(html.includes('<title>My Page</title>'), true);
+    assert.strictEqual(html.includes('<h1>My Page</h1>'), true);
   });
 
-  test('should include content in body', () => {
-    const html = createPageHtml('Title', 'This is my content');
+  test('should apply markdown to body content via textToHtml', () => {
+    const html = createPageHtml('Title', '**bold** content');
 
-    assert.strictEqual(html.includes('This is my content'), true);
+    assert.strictEqual(html.includes('<strong>bold</strong>'), true);
   });
 
   test('should include timestamp', () => {
@@ -862,11 +702,22 @@ describe('createPageHtml', () => {
     assert.strictEqual(html.includes('Created via OneNote MCP on'), true);
   });
 
-  test('should include charset meta tag', () => {
-    const html = createPageHtml('Title', 'Content');
+  test('should NOT run the title through the markdown converter', () => {
+    // A title starting with a markdown token must stay literal, not become an <h1>.
+    const html = createPageHtml('# Plan', 'Body');
 
-    assert.strictEqual(html.includes('<meta charset="utf-8">'), true);
+    assert.strictEqual(html.includes('<title># Plan</title>'), true);
+    assert.strictEqual(html.includes('<h1># Plan</h1>'), true);
+    // The buggy behavior would nest a <p> inside <title>; it must not appear.
+    assert.strictEqual(html.includes('<title><p>'), false);
+  });
+
+  test('should HTML-escape special characters in the title', () => {
+    const html = createPageHtml('A < B & C > D', 'Body');
+
+    assert.strictEqual(html.includes('<title>A &lt; B &amp; C &gt; D</title>'), true);
+    assert.strictEqual(html.includes('<h1>A &lt; B &amp; C &gt; D</h1>'), true);
   });
 });
 
-console.log(' All integration tests defined. Run with: node --test test_integration.mjs');
+console.log('All integration tests defined. Run with: node --test test_integration.mjs');

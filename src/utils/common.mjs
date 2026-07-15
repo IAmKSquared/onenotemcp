@@ -18,6 +18,18 @@ export function escapeODataString(str) {
 }
 
 /**
+ * Escapes HTML special characters to prevent markup injection.
+ * Converts &, <, and > to their character entities, in that order so the
+ * ampersand replacement does not double-escape the entities it produces.
+ * @param {string} text - The text to escape.
+ * @returns {string} The escaped text, safe to interpolate into HTML.
+ */
+export function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
  * Validates URL safety and prevents javascript: protocol injection
  * @param {string} url - The URL to sanitize
  * @returns {string} Safe URL or '#' if unsafe
