@@ -23,16 +23,22 @@ import pino from 'pino';
 // MCP servers must keep stdout clean for JSON-RPC protocol messages.
 // In development, lazily import pino-pretty (a devDependency) so that
 // production installs (npm install --omit=dev) don't crash on a missing
-// module; in production we log directly to stderr.
-const stream =
-  process.env.NODE_ENV !== 'production'
-    ? (await import('pino-pretty')).default({
-        colorize: true,
-        translateTime: 'HH:MM:ss',
-        ignore: 'pid,hostname',
-        destination: 2, // stderr file descriptor
-      })
-    : process.stderr;
+// module; in production we log directly to stderr. The try/catch covers
+// prod installs that forgot to set NODE_ENV=production — pino-pretty is
+// absent there too, and startup must survive it.
+let stream = process.stderr;
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    stream = (await import('pino-pretty')).default({
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname',
+      destination: 2, // stderr file descriptor
+    });
+  } catch {
+    // pino-pretty not installed — fall back to plain stderr logging
+  }
+}
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' }, stream);
 

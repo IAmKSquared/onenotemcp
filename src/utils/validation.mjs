@@ -63,7 +63,10 @@ export async function patchPageContent(
     const error = new Error(
       `${errorPrefix}: ${response.status} ${response.statusText}. Details: ${errorBody}`
     );
-    error.statusCode = response.status; // enables retryWithBackoff / getDetailedErrorMessage classification
+    // Enables retryWithBackoff / getDetailedErrorMessage classification.
+    // Accepted tradeoff: a 5xx after Graph already applied the PATCH means the
+    // retry can duplicate appended content — rare, and better than failing the write.
+    error.statusCode = response.status;
     throw error;
   }
 
