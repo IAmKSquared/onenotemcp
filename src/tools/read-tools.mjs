@@ -373,8 +373,7 @@ export function registerReadTools(server, session) {
         .min(1)
         .max(50)
         .default(10)
-        .describe('Number of pages to return (default: 10, max: 50).')
-        .optional(),
+        .describe('Number of pages to return (default: 10, max: 50).'),
     },
     createToolHandler(
       session,
@@ -449,8 +448,7 @@ export function registerReadTools(server, session) {
       format: z
         .enum(['text', 'html', 'summary'])
         .default('text')
-        .describe('Format of the content: text (readable), html (raw), or summary (brief).')
-        .optional(),
+        .describe('Format of the content: text (readable), html (raw), or summary (brief).'),
     },
     createToolHandler(
       session,
@@ -489,8 +487,7 @@ export function registerReadTools(server, session) {
       format: z
         .enum(['text', 'html', 'summary'])
         .default('text')
-        .describe('Format of the content: text, html, or summary.')
-        .optional(),
+        .describe('Format of the content: text, html, or summary.'),
     },
     createToolHandler(
       session,
