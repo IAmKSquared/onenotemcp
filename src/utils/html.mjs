@@ -1,4 +1,4 @@
-import { textToHtml, sanitizeUrl } from '../utils/common.mjs';
+import { textToHtml, sanitizeUrl, escapeHtml } from '../utils/common.mjs';
 import { DISPLAY_LIMITS } from '../config/constants.mjs';
 
 /**
@@ -122,20 +122,24 @@ export function formatItemList(
 
 /**
  * Creates a complete HTML document for a OneNote page.
+ * The title is HTML-escaped as plain text (markdown is not applied to it, so
+ * titles beginning with markdown tokens like "# " stay literal); the body
+ * content is converted from markdown-style text via textToHtml.
  * @param {string} title - The page title.
  * @param {string} content - The page content (plain text or markdown).
  * @returns {string} Complete HTML document ready for OneNote API.
  */
 export function createPageHtml(title, content) {
   const htmlContent = textToHtml(content);
+  const escapedTitle = escapeHtml(title);
   return `<!DOCTYPE html>
 <html>
 <head>
-  <title>${textToHtml(title)}</title>
+  <title>${escapedTitle}</title>
   <meta charset="utf-8">
 </head>
 <body>
-  <h1>${textToHtml(title)}</h1>
+  <h1>${escapedTitle}</h1>
   ${htmlContent}
   <hr>
   <p><em>Created via OneNote MCP on ${new Date().toLocaleString()}</em></p>

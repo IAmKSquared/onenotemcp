@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { JSDOM } from 'jsdom';
 import { createToolHandler } from '../api/retry.mjs';
 import { patchPageContent } from '../utils/validation.mjs';
-import { textToHtml, validateId, validateCsvData } from '../utils/common.mjs';
+import { textToHtml, validateId, validateCsvData, escapeHtml } from '../utils/common.mjs';
 import { fetchPageContentAdvanced } from '../utils/validation.mjs';
 import { HTTP_STATUS } from '../config/constants.mjs';
 import { logger } from '../utils/logger.mjs';
@@ -127,7 +128,7 @@ export function registerWriteTools(server, session) {
         await patchPageContent(
           session,
           validatedPageId,
-          [{ target: 'title', action: 'replace', content: newTitle }],
+          [{ target: 'title', action: 'replace', content: escapeHtml(newTitle) }],
           'Title update failed'
         );
 
@@ -163,7 +164,30 @@ export function registerWriteTools(server, session) {
 
         const flags = caseSensitive ? 'g' : 'gi';
         const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
-        const matches = (htmlContent.match(regex) || []).length;
+
+        // Match against text nodes only so tag names/attributes are never touched.
+        // Serializing the mutated node values re-escapes HTML automatically, so
+        // replaceText is inserted literally (dollar patterns are inert via the
+        // function replacement).
+        const dom = new JSDOM(htmlContent);
+        const document = dom.window.document;
+        const walker = document.createTreeWalker(document.body, dom.window.NodeFilter.SHOW_TEXT);
+
+        let matches = 0;
+        const textNodes = [];
+        let currentNode = walker.nextNode();
+        while (currentNode) {
+          textNodes.push(currentNode);
+          currentNode = walker.nextNode();
+        }
+
+        for (const node of textNodes) {
+          const occurrences = (node.nodeValue.match(regex) || []).length;
+          if (occurrences > 0) {
+            matches += occurrences;
+            node.nodeValue = node.nodeValue.replace(regex, () => replaceText);
+          }
+        }
 
         if (matches === 0) {
           return {
@@ -176,7 +200,7 @@ export function registerWriteTools(server, session) {
           };
         }
 
-        const updatedContent = htmlContent.replace(regex, replaceText);
+        const updatedContent = document.body.innerHTML;
         await patchPageContent(
           session,
           validatedPageId,
