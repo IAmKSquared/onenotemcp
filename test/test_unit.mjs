@@ -22,6 +22,8 @@ import {
   formatMetadata,
   formatItemInfo,
 } from '../src/utils/html.mjs';
+import { registerReadTools } from '../src/tools/read-tools.mjs';
+import { registerWriteTools } from '../src/tools/write-tools.mjs';
 
 // ============================================================================
 // Security Functions Tests
@@ -950,6 +952,75 @@ describe('formatItemInfo', () => {
     assert.strictEqual(result.includes('data:'), false);
     assert.strictEqual(result.includes('[Web]'), false);
     assert.strictEqual(result.includes('[App]'), false);
+  });
+});
+
+// ============================================================================
+// Tool Schema Defaults Tests
+// ============================================================================
+
+describe('tool schema defaults', () => {
+  // Capture every tool's zod schema by registering against a mock server.
+  const toolSchemas = {};
+  const mockServer = {
+    tool: (name, schema) => {
+      toolSchemas[name] = schema;
+    },
+  };
+  registerReadTools(mockServer, {});
+  registerWriteTools(mockServer, {});
+
+  /**
+   * Walks a field's wrapper chain (ZodOptional, ZodEffects, ...) looking for a ZodDefault.
+   * @param {import('zod').ZodTypeAny} field - The zod field to inspect.
+   * @returns {{value: unknown} | null} The default wrapped in an object (so an undefined default stays distinguishable), or null if the field has none.
+   */
+  function findDefault(field) {
+    let current = field;
+    while (current?._def) {
+      if (current._def.typeName === 'ZodDefault') {
+        return { value: current._def.defaultValue() };
+      }
+      current = current._def.innerType;
+    }
+    return null;
+  }
+
+  // Guards against the .default().optional() regression: ZodOptional
+  // short-circuits undefined before ZodDefault runs, so documented
+  // defaults silently never apply.
+  test('every parameter with a default applies it when omitted', () => {
+    let checked = 0;
+    for (const [toolName, schema] of Object.entries(toolSchemas)) {
+      for (const [param, field] of Object.entries(schema)) {
+        const found = findDefault(field);
+        if (!found) continue;
+        checked++;
+        assert.deepStrictEqual(
+          field.parse(undefined),
+          found.value,
+          `${toolName}.${param} should default to ${JSON.stringify(found.value)} when omitted`
+        );
+      }
+    }
+    assert.ok(checked >= 10, 'expected at least 10 defaulted parameters, found ' + checked);
+  });
+
+  test('every parameter with a default stays optional for MCP clients', () => {
+    for (const [toolName, schema] of Object.entries(toolSchemas)) {
+      for (const [param, field] of Object.entries(schema)) {
+        if (!findDefault(field)) continue;
+        assert.strictEqual(
+          field.isOptional(),
+          true,
+          toolName + '.' + param + ' has a default but would be required in the tool schema'
+        );
+      }
+    }
+  });
+
+  test('addNoteToPage noteType defaults to note', () => {
+    assert.strictEqual(toolSchemas.addNoteToPage.noteType.parse(undefined), 'note');
   });
 });
 

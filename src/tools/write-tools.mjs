@@ -31,11 +31,7 @@ export function registerWriteTools(server, session) {
     {
       pageId: z.string().describe('The ID of the page to update.'),
       content: z.string().describe('New page content (HTML or markdown-style text).'),
-      preserveTitle: z
-        .boolean()
-        .default(true)
-        .describe('Keep the original title (default: true).')
-        .optional(),
+      preserveTitle: z.boolean().default(true).describe('Keep the original title (default: true).'),
     },
     createToolHandler(
       session,
@@ -74,16 +70,8 @@ export function registerWriteTools(server, session) {
     {
       pageId: z.string().describe('The ID of the page to append content to.'),
       content: z.string().describe('Content to append (HTML or markdown-style).'),
-      addTimestamp: z
-        .boolean()
-        .default(true)
-        .describe('Add a timestamp (default: true).')
-        .optional(),
-      addSeparator: z
-        .boolean()
-        .default(true)
-        .describe('Add a visual separator (default: true).')
-        .optional(),
+      addTimestamp: z.boolean().default(true).describe('Add a timestamp (default: true).'),
+      addSeparator: z.boolean().default(true).describe('Add a visual separator (default: true).'),
     },
     createToolHandler(
       session,
@@ -162,11 +150,7 @@ export function registerWriteTools(server, session) {
       pageId: z.string().describe('The ID of the page to modify.'),
       findText: z.string().describe('The text to find and replace.'),
       replaceText: z.string().describe('The text to replace with.'),
-      caseSensitive: z
-        .boolean()
-        .default(false)
-        .describe('Case-sensitive search (default: false).')
-        .optional(),
+      caseSensitive: z.boolean().default(false).describe('Case-sensitive search (default: false).'),
     },
     createToolHandler(
       session,
@@ -221,13 +205,11 @@ export function registerWriteTools(server, session) {
       noteType: z
         .enum(['note', 'todo', 'important', 'question'])
         .default('note')
-        .describe('Type of note (note, todo, important, question).')
-        .optional(),
+        .describe('Type of note (note, todo, important, question).'),
       position: z
         .enum(['top', 'bottom'])
         .default('bottom')
-        .describe('Position to add the note (top or bottom).')
-        .optional(),
+        .describe('Position to add the note (top or bottom).'),
     },
     createToolHandler(
       session,
@@ -277,8 +259,7 @@ export function registerWriteTools(server, session) {
       position: z
         .enum(['top', 'bottom'])
         .default('bottom')
-        .describe('Position to add the table (top or bottom).')
-        .optional(),
+        .describe('Position to add the table (top or bottom).'),
     },
     createToolHandler(
       session,

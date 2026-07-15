@@ -1,5 +1,4 @@
 import pino from 'pino';
-import pinoPretty from 'pino-pretty';
 
 /**
  * Centralized logging utility using Pino.
@@ -20,21 +19,27 @@ import pinoPretty from 'pino-pretty';
  *   logger.error({ err: error }, 'Authentication failed');
  */
 
-// Configure pino to output to stderr for MCP compatibility
-// MCP servers must keep stdout clean for JSON-RPC protocol messages
-// Use pino-pretty stream that writes directly to stderr
-const prettyStream = pinoPretty({
-  colorize: true,
-  translateTime: 'HH:MM:ss',
-  ignore: 'pid,hostname',
-  destination: 2, // stderr file descriptor
-});
+// Configure pino to output to stderr for MCP compatibility.
+// MCP servers must keep stdout clean for JSON-RPC protocol messages.
+// In development, lazily import pino-pretty (a devDependency) so that
+// production installs (npm install --omit=dev) don't crash on a missing
+// module; in production we log directly to stderr. The try/catch covers
+// prod installs that forgot to set NODE_ENV=production — pino-pretty is
+// absent there too, and startup must survive it.
+let stream = process.stderr;
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    stream = (await import('pino-pretty')).default({
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname',
+      destination: 2, // stderr file descriptor
+    });
+  } catch {
+    // pino-pretty not installed — fall back to plain stderr logging
+  }
+}
 
-const logger = pino(
-  {
-    level: process.env.LOG_LEVEL || 'info',
-  },
-  process.env.NODE_ENV !== 'production' ? prettyStream : process.stderr
-);
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' }, stream);
 
 export { logger };
