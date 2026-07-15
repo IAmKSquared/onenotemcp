@@ -28,18 +28,12 @@ export async function authenticateWithDeviceCode(session) {
     });
 
     const authPromise = credential.getToken(scopes);
-    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.DEVICE_CODE_CALLBACK_MS)); // Allow time for userPromptCallback
 
-    if (!deviceCodeInfo) {
-      return {
-        success: false,
-        deviceCodeInfo: null,
-        authPromise: null,
-        error: 'Could not retrieve device code information.',
-      };
-    }
-
-    // Set up background token handling
+    // Set up background token handling immediately. Attaching the handlers
+    // before the sleep and early return guarantees the promise always has a
+    // rejection handler; otherwise a getToken rejection during the sleep or an
+    // early return with no handlers ever attached would surface as an unhandled
+    // rejection and crash the whole MCP server.
     authPromise
       .then(async (tokenResponse) => {
         session.setAccessToken(tokenResponse.token);
@@ -59,6 +53,17 @@ export async function authenticateWithDeviceCode(session) {
         logger.error({ err: error }, 'Background authentication failed');
         session.setAuthError(error?.message || 'Authentication failed');
       });
+
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.DEVICE_CODE_CALLBACK_MS)); // Allow time for userPromptCallback
+
+    if (!deviceCodeInfo) {
+      return {
+        success: false,
+        deviceCodeInfo: null,
+        authPromise: null,
+        error: 'Could not retrieve device code information.',
+      };
+    }
 
     return {
       success: true,

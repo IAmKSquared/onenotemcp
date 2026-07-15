@@ -18,9 +18,11 @@ export async function fetchPageContentAdvanced(session, pageId, method = 'httpDi
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(
+      const error = new Error(
         `HTTP error fetching page content! Status: ${response.status} ${response.statusText}. Details: ${errorBody}`
       );
+      error.statusCode = response.status; // enables retryWithBackoff / getDetailedErrorMessage classification
+      throw error;
     }
     return await response.text();
   } else {
@@ -58,9 +60,11 @@ export async function patchPageContent(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(
+    const error = new Error(
       `${errorPrefix}: ${response.status} ${response.statusText}. Details: ${errorBody}`
     );
+    error.statusCode = response.status; // enables retryWithBackoff / getDetailedErrorMessage classification
+    throw error;
   }
 
   return response;
