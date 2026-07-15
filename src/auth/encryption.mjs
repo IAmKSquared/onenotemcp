@@ -74,7 +74,8 @@ export async function encrypt(text) {
  * Decrypts text using AES-256-GCM (authenticated encryption).
  * @param {object} text - The encrypted data object { iv, encryptedData, authTag }.
  * @returns {Promise<string>} The decrypted text.
- * @throws {DecryptionError} If the input is invalid or authentication tag is invalid (data was tampered with).
+ * @throws {DecryptionError} If the input object is structurally invalid (wrong type or missing fields).
+ * @throws {Error} A native crypto error if GCM authentication fails (data was tampered with or the key is wrong).
  */
 export async function decrypt(text) {
   // Validate input structure

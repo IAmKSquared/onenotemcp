@@ -21,8 +21,10 @@ export function escapeODataString(str) {
  * Escapes HTML special characters to prevent markup injection.
  * Converts &, <, and > to their character entities, in that order so the
  * ampersand replacement does not double-escape the entities it produces.
+ * Quotes are NOT escaped, so the result is safe for element text content
+ * only — never interpolate it into an attribute value.
  * @param {string} text - The text to escape.
- * @returns {string} The escaped text, safe to interpolate into HTML.
+ * @returns {string} The escaped text, safe to use as element text content.
  */
 export function escapeHtml(text) {
   if (!text) return '';
